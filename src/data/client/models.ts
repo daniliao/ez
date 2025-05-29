@@ -148,6 +148,8 @@ export const recordItemSchema = z.object({
         unit: z.string().optional(),
         min: z.string().optional(),
         max: z.string().optional(),
+        interpretation: z.string().optional(),
+        notes: z.string().optional(),
     }).or(z.string())).optional()
 
   });

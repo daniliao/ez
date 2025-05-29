@@ -54,12 +54,14 @@ export function Chat() {
   const config = useContext(ConfigContext);
   const chatContext = useContext(ChatContext);
   const [currentMessage, setCurrentMessage] = useState('');
-  const [llmProvider, setLlmProvider] = useState('chatgpt');
-  const [llmModel, setLlmModel] = useState('chatgpt-4o-latest');
+  const [llmProvider, setLlmProvider] = useState('');
+  const [llmModel, setLlmModel] = useState('');
   const messageTextArea = useRef<HTMLTextAreaElement | null>(null);
   const lastMessageRef = useRef<HTMLDivElement | null>(null);
   const [addFolderContext, setFolderContext] = useState(true);
-
+  const [crosscheckAnswers, setCrosscheckAnswers] = useState(process.env.NEXT_PUBLIC_CHAT_CROSSCHECK_DISABLE ? false : true);
+  const [crosscheckModel, setCrosscheckModel] = useState('chatgpt-4o-latest');
+  const [crosscheckProvider, setCrosscheckProvider] = useState('chatgpt');
   const [defaultLLMModel, setDefaultLLMModel] = useState('chatgpt-4o-latest');
   const [warningRead, setWarningRead] = useState(false);
 
@@ -77,11 +79,15 @@ export function Chat() {
     }
     async function loadConfig() {
       setDefaultChatProvider(await config?.getServerConfig('llmProviderChat') as string);
-      setLlmProvider(await config?.getServerConfig('llmProviderChat') as string);
-      setLlmModel(await config?.getServerConfig('llmModelChat') as string ?? 'chatgpt-4o-latest');
+      if(!llmProvider) {
+          setLlmProvider(await config?.getServerConfig('llmProviderChat') as string);
+      }
+      if (!llmModel) {  
+        setLlmModel(await config?.getServerConfig('llmModelChat') as string ?? 'chatgpt-4o-latest');
+      }
+
       const configOllamaUrl = await config?.getServerConfig('ollamaUrl') as string
       setOllamaUrl(configOllamaUrl);
-      setShowProviders(process.env.NEXT_PUBLIC_CHAT_PROVIDER_SELECT !== "" && (configOllamaUrl !== null && typeof configOllamaUrl === 'string' && configOllamaUrl.startsWith('http')));
 
       setFolderContext(coercedVal(await config?.getServerConfig('autoLoadFolderContext'), true) as boolean);
 //      if (chatContext.areRecordsLoaded === false && !chatContext.isStreaming && await chatContext.checkApiConfig()) {
@@ -97,6 +103,19 @@ export function Chat() {
 
     messageTextArea.current?.focus();
   }, [chatContext.messages, chatContext.lastMessage, chatContext.isStreaming, recordContext?.records, config]);
+
+
+  // useEffect(() => { // we support changin
+  //   if (llmProvider === 'gemini') {
+  //     setLlmModel('gemini-2.5-pro-preview-05-06');
+  //   }
+  //   if (llmProvider === 'chatgpt') {
+  //     setLlmModel('chatgpt-4o-latest');
+  //   }
+  //   if (llmProvider === 'ollama') {
+  //     setLlmModel('llama3.1:latest');
+  //   }
+  // }, [llmProvider]);
   
 
   const handleSubmit = async () => {
@@ -140,14 +159,30 @@ export function Chat() {
       <DrawerContent className="sm:max-w-[825px] bg-white dark:bg-zinc-950">
         <DrawerHeader>
           <DrawerTitle>Chat with AI {!process.env.NEXT_PUBLIC_SAAS ? (<Button variant="ghost" onClick={(e) => { config?.setConfigDialogOpen(true); }}><SettingsIcon className="w-4 h-4" /></Button>) : null}
-          {/* {<DropdownMenu>
+          <DropdownMenu>
             <DropdownMenuTrigger><Button><ChatBubbleIcon className="w-4 h-4 mr-2"/>AI Model</Button></DropdownMenuTrigger>
             <DropdownMenuContent className="dark:bg-black bg-white">
             <DropdownMenuItem onSelect={(e) => {
                 setLlmProvider('chatgpt');
                 setLlmModel('chatgpt-4o-latest');
-              }}> { llmModel === 'chatgpt-4o-latest' || llmModel === '' ? <CheckIcon className="mr-2" /> : null } Chat with ChatGPT</DropdownMenuItem>
-              <DropdownMenuItem onSelect={(e) => {
+              }}> { llmModel === 'chatgpt-4o-latest' || llmModel === '' ? <CheckIcon className="mr-2" /> : null } Chat with ChatGPT 4o</DropdownMenuItem>
+
+<DropdownMenuItem onSelect={(e) => {
+                setLlmProvider('chatgpt');
+                setLlmModel('o1');
+              }}> { llmModel === 'o1' ? <CheckIcon className="mr-2" /> : null } Chat with ChatGPT o1</DropdownMenuItem>
+
+                <DropdownMenuItem onSelect={(e) => {
+                  setLlmProvider('gemini');
+                  setLlmModel('gemini-2.5-pro-preview-05-06');
+                }}> { llmModel === 'gemini-2.5-pro-preview-05-06' ? <CheckIcon className="mr-2" /> : null } Chat with Gemini 2.5 PRO</DropdownMenuItem>
+
+                <DropdownMenuItem onSelect={(e) => {
+                  setLlmProvider('gemini');
+                  setLlmModel('gemini-2.5-flash-preview-05-20');
+                }}> { llmModel === 'gemini-2.5-flash-preview-05-20' ? <CheckIcon className="mr-2" /> : null } Chat with Gemini 2.5 Flash</DropdownMenuItem>
+
+              {/* <DropdownMenuItem onSelect={(e) => {
                 setLlmProvider('ollama');
                 setLlmModel('llama3.1:latest');
               }}>Chat with LLama 3.1</DropdownMenuItem>
@@ -162,9 +197,9 @@ export function Chat() {
               <DropdownMenuItem onSelect={(e) => {
                 setLlmProvider('ollama');
                 setLlmModel('monotykamary/medichat-llama3:latest');
-              }}>{ llmModel === 'monotykamary/medichat-llama3:latest' ? <CheckIcon className="mr-2" /> : null } Chat with Medichat LLama 3</DropdownMenuItem>
+              }}>{ llmModel === 'monotykamary/medichat-llama3:latest' ? <CheckIcon className="mr-2" /> : null } Chat with Medichat LLama 3</DropdownMenuItem> */}
             </DropdownMenuContent>
-          </DropdownMenu>           } */}
+          </DropdownMenu>
           
           {<DropdownMenu>
             <DropdownMenuTrigger  className="ml-2"><Button><CheckCircle2 className="w-4 h-4 mr-2" /> AI Crosscheck</Button></DropdownMenuTrigger>
@@ -445,18 +480,24 @@ export function Chat() {
               />
               <div className="absolute flex top-3 right-3 gap-2">
                 <div className="xxs:invisible md:visible">
+                {showProviders ? (  
+
                   <Select id="llmProvider" value={llmProvider} onValueChange={setLlmProvider}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue  placeholder="Default: Chat GPT" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem key="chatgpt" value="chatgpt">Cloud: Chat GPT</SelectItem>
-                        {showProviders ? (
-                          <SelectItem key="ollama" value="ollama">Local: Ollama</SelectItem>
-                        ): null}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Default: Chat GPT" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem key="chatgpt" value="chatgpt">Cloud: Chat GPT</SelectItem>
+                      {showProviders ? (  
+                        <SelectItem key="gemini" value="gemini">Cloud: Gemini</SelectItem>
+                      ): null}
+                      {showProviders ? (
+                        <SelectItem key="ollama" value="ollama">Local: Ollama</SelectItem>
+                      ): null}
+                    </SelectContent>
+                  </Select>
+                ): null}
+                </div>
 
                 <Button type="submit" size="icon" className="w-8 h-8" onClick={() => {
                   handleSubmit();

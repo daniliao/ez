@@ -12,11 +12,13 @@
     "generate-audit": "drizzle-kit generate --config drizzle.audit.config.ts"
   },
   "dependencies": {
+    "@ai-sdk/google": "^1.2.18",
     "@ai-sdk/openai": "^0.0.36",
     "@chengsokdara/use-whisper": "^0.2.0",
     "@enhances/with-resolvers": "^0.0.5",
     "@ffmpeg/core": "0.11.0",
     "@ffmpeg/ffmpeg": "^0.12.10",
+    "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.6.0",
     "@next/bundle-analyzer": "^14.2.5",
     "@radix-ui/react-accordion": "^1.2.0",

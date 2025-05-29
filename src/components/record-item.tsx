@@ -22,6 +22,7 @@ import { DatabaseContext } from "@/contexts/db-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import ZoomableImage from './zoomable-image';
+import { convertRecordIdsToLinks } from '@/lib/utils';
 
 //import RecordItemJson from "@/components/record-item-json";
 //import RecordItemExtra from '@/components/record-item-extra';
@@ -194,7 +195,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
           ): ''}
             <TabsContent value="text" className="max-w-600">
               {record.description ? (
-                <div className="mt-5 rose text-sm text-muted-foreground"><Markdown className={styles.markdown} remarkPlugins={[remarkGfm]}>{record.description}</Markdown></div>
+                <div className="mt-5 rose text-sm text-muted-foreground"><Markdown className={styles.markdown} remarkPlugins={[remarkGfm]}>{convertRecordIdsToLinks(record.description)}</Markdown></div>
               ): '' }
               <div className="mt-2 flex flex-wrap items-center gap-2 w-100">
                 {record.tags && record.tags.length > 0 ? (
@@ -249,7 +250,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                     <AccordionTrigger>Full text extracted from files</AccordionTrigger>
                     <AccordionContent>
                       <Markdown className={styles.markdown} remarkPlugins={[remarkGfm]}>
-                        {record.text}
+                        {convertRecordIdsToLinks(record.text)}
                       </Markdown>
                     </AccordionContent>
                   </AccordionItem>
@@ -319,10 +320,11 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
 }
 
 
-function RefreshCwIcon(props) {
+function RefreshCwIcon(props: { children: React.ReactNode; className?: string; node?: any }) {
+  const {children, className, node, ...rest} = props
   return (
     <svg
-      {...props}
+      {...rest}
       xmlns="http://www.w3.org/2000/svg"
       width="24"
       height="24"

@@ -15,9 +15,10 @@ export const prompts = {
                 Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
                 Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
+                Do not put into summary and title any terms or words that are not in the text. Add page number of the terms occurences to the terms used in the title and summary in () brackets. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
                 extract very detailed and all features from it and put it as an array under "findings" key. Second: Markdown text - please do kind of OCR - so convert all the \
-                attachments to text. Please use markdown to format it nicely and return after JSON object, \
+                attachments to text. If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. Please use markdown to format it nicely and return after JSON object, \
                 wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n: \r\n\r\n```json\r\n \
                 ' + JSON.stringify(itemSchema) + '```\r\n\r\n'
     }, // [ { type: "blood_results", subtype: "morphology", findings: [], ... }, {type: "mri", subtype: "head mri", ...}]
@@ -26,6 +27,7 @@ export const prompts = {
                 First: JSON should be all in original language. \
                 Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
                 Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
+                Do not put into summary and title any terms or words that are not in the text.  Add page number of the terms occurences to the terms used in the title and summary in () brackets.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
                 extract very detailed and all features from it and put it as an array under "findings" key. \n\r\n\rSecond: Fix all the original text issues and glitches. Please use markdown to format the nicely and return after JSON object, \
@@ -39,10 +41,11 @@ export const prompts = {
                 First: JSON should be all in original language. \
                 Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
                 Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
+                Do not put into summary and title any terms or words that are not in the text.  Add page number of the terms occurences to the terms used in the title and summary in () brackets.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
                 extract very detailed and all features from it and put it as an array under "findings" key. Second: Markdown text - please do kind of OCR - so convert all the \
-                attachments to text. Please use markdown to format it nicely and return after JSON object, \
+                attachments to text. f the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. Please use markdown to format it nicely and return after JSON object, \
                 wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n: \r\n\r\n```json\r\n \
                 ' + JSON.stringify(itemSchema) + '```\r\n\r\n'
     }, // [ { type: "blood_results", subtype: "morphology", findings: [], ... }, {type: "mri", subtype: "head mri", ...}]
@@ -52,6 +55,8 @@ export const prompts = {
                 First: JSON should be all in original language. \
                 Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
                 Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
+                If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. \
+                Do not put into summary and title any terms or words that are not in the text.  Add page number of the terms occurences to the terms used in the title and summary in () brackets.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
                 extract very detailed and all features from it and put it as an array under "findings" key. \n\r\n\rSecond: Fix all the original text issues and glitches. Please use markdown to format the nicely and return after JSON object, \
@@ -59,6 +64,11 @@ export const prompts = {
                 JSON.stringify(itemSchema) + '```\r\n\r\n Original text: ' + ocrText;
     }, // [ { type: "blood_results", subtype: "morphology", findings: [], ... }, {type: "mri", subtype: "head mri", ...}]
 
+
+    generateRecordMetaData: (context: PromptContext, text: string) => {
+        return 'Generate meta data for the record: ' + text + '. Do not use the domain specific terms and words that are not in the text in the summary - do not add your custom interpretations over medical terms. Return JSON with written in original language in the following schema: \
+                ' + JSON.stringify(itemSchema) + '```\r\n\r\n'        
+    },
 
     recordRemovePII: (context: PromptContext, ocrText: string) => {
         return 'Please remove Personal Data (names, first names, last names, company names, emails, id numbers, phone numbers, addresses), fix language errors and format markdown from the text ' + ocrText
@@ -68,21 +78,21 @@ export const prompts = {
         \r\n' + JSON.stringify(context.record?.json) + '```'
     },
     recordIntoChatSimplified: (context: PromptContext) => {
-        return 'Structured health record in JSON:  \r\n\r\n```json\
+        return 'Structured health record (Record Id: ' + context.record?.id + ', date: ' + context.record?.eventDate + ') in JSON:  \r\n\r\n```json\
         \r\n' + JSON.stringify(context.record?.json) + '```'
     },
     translateRecord: (context: PromptContext & { language: string}) => {
-        return 'Translate this health record to ' + context.language + ' language. Return translated JSON plus translated markdown: \r\n\r\n```json\
+        return 'Translate this health record to ' + context.language + ' language. Be as exact as possible. Do not add any custom interpretations over medical terms. Return translated JSON plus translated markdown: \r\n\r\n```json\
         '+ JSON.stringify(context.record?.json) + "```\r\n\r\n```markdown\r\n" + context.record?.text + '```';
     },
     translateRecordText: (context: PromptContext & { language: string}) => {
-        return 'Translate this health record to ' + context.language + ' language: ' + context.record?.description + ' ' + context.record?.text;
+        return 'Translate this health record to ' + context.language + ' language, Be as exact as possible. Do not add any custom interpretations over medical terms: ' + context.record?.description + ' ' + context.record?.text;
     },
     recordSummary: (context: PromptContext) => {
         return 'Summarize the health result data below in one sentence: ' + context.record?.text
     },
     recordsToChat: (context: PromptContext) => {
-        return 'OK. Now I will send you all my health records. Answer for now just with the number of records you received. Then I will ask more questions'
+        return 'OK. Now I will send you all my health records. Answer for now just with the number of records you received. Then I will ask more questions. ALWAYS add (Record Id: number) to the answer based on this record.'
     },
     recordsToChatDone: (context: PromptContext & { records: Record[] }) => {
         return 'Health record context (' + context.records.length + ' records) sent.';
@@ -95,7 +105,7 @@ export const prompts = {
         \r\n' + JSON.stringify(context.record?.json) + '```'
     },
     safetyMessage: (context: PromptContext) => {
-        return 'Add information sources and links. Avoid diagnosis and any potentially dangerous recommendations.';
+        return 'Add information sources and links. Avoid diagnosis and any potentially dangerous recommendations. Do not add any custom interpretations over medical terms. Try to base on exact medical terms used in the medical records and always base on factual data from the context. Providing any facts from the records history always ADD REFERENCE IN BRACKETS to the medical records from the context (for example Record Id: 7, referencing this record)'
     },
     autoCheck: (context: PromptContext) => {
         return 'Check the if last message is correct and valid regarding the medical knowledge and the context included within the conversaion. Score: Green, Yellow or Red the message risk and validity. If needed return the next question I should ask to fix the answer or get deeper. Add the explanation including your own answer and safe recommendations (include sources). Return ONLY JSON for example: { "risk": "green", "validity": "green", "answer": "For Asthma you should contact your physician. Ibuprofen is not the right answer", "explanation": "Ibuprofen is not valid for treating asthma", nextQuestion: "What is the recommended treatment for asthma?" }'

@@ -129,10 +129,12 @@ export function SettingsPopup() {
   const [llmProviderParse, setLlmProviderParse] = useState("chatgpt")
   const [llmProviderRemovePII, setLlmProviderRemovePII] = useState("");
   const [ollamaModel, setOllamaModel] = useState("llama3.1")
+  const [geminiApiKey, setGeminiApiKey] = useState("");
 
   const { handleSubmit, register, setError, getValues, setValue, formState: { errors,  } } = useForm({
       defaultValues: {
         chatGptApiKey: "",
+        geminiApiKey: "",
         displayAttachmentPreviews: true,
         autoLoadFolderContext: true,
         autoParseRecord: true,
@@ -140,13 +142,13 @@ export function SettingsPopup() {
         ocrLanguage: "eng",
         ollamaUrl: "",
         piiGeneralData: ""
-
     }
   });
 
   useEffect(() => {  // load default configuration
     async function fetchDefaultConfig() {
       const chatGptKey = await config?.getServerConfig('chatGptApiKey');
+      const geminiKey = await config?.getServerConfig('geminiApiKey');
       const displayAttachmentPreviews = await config?.getServerConfig('displayAttachmentPreviews');
       const autoLoadFolderContext = await config?.getServerConfig('autoLoadFolderContext');
       const autoParseRecord = await config?.getServerConfig('autoParseRecord');
@@ -164,9 +166,10 @@ export function SettingsPopup() {
       setLlmProviderParse(llmProviderParse);
       setLlmProviderRemovePII(llmProviderRemovePII);
       setOllamaModel(ollamaModel)
-    
+      setGeminiApiKey(geminiKey as string);
 
       setValue("chatGptApiKey", chatGptKey as string);
+      setValue("geminiApiKey", geminiKey as string);
       setValue("displayAttachmentPreviews", coercedVal(displayAttachmentPreviews, true) as boolean);
       setValue("autoLoadFolderContext", coercedVal(autoLoadFolderContext, true) as boolean);
       setValue("autoParseRecord", coercedVal(autoParseRecord, true) as boolean);
@@ -178,8 +181,9 @@ export function SettingsPopup() {
     fetchDefaultConfig();
   }, [config, setValue]);
 
-  async function onSubmit(formData) { // TODO: we probably need a method in the config-context to setup the config model - so all available server and local config variables  with default values
+  async function onSubmit(formData) {
     config?.setServerConfig('chatGptApiKey', formData['chatGptApiKey']);
+    config?.setServerConfig('geminiApiKey', formData['geminiApiKey']);
     config?.setServerConfig('ocrProvider', ocrProvider as string || 'chatgpt');
     config?.setServerConfig('displayAttachmentPreviews', formData['displayAttachmentPreviews'] as string);
     config?.setServerConfig('autoLoadFolderContext', formData['autoLoadFolderContext'] as string);
@@ -274,6 +278,7 @@ export function SettingsPopup() {
                           <SelectContent>
                             <SelectItem key="chatgpt" value="chatgpt">Cloud: Chat GPT</SelectItem>
                             <SelectItem key="tesseract" value="tesseract">Browser: Tesseract</SelectItem>
+                            <SelectItem key="gemini" value="gemini">Cloud: Gemini</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -298,6 +303,7 @@ export function SettingsPopup() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem key="chatgpt" value="chatgpt">Cloud: Chat GPT</SelectItem>
+                            <SelectItem key="gemini" value="gemini">Cloud: Gemini</SelectItem>
                             <SelectItem key="ollama" value="ollama">Local: Ollama</SelectItem>
                           </SelectContent>
                         </Select>
@@ -310,6 +316,7 @@ export function SettingsPopup() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem key="chatgpt" value="chatgpt">Cloud: Chat GPT</SelectItem>
+                            <SelectItem key="gemini" value="gemini">Cloud: Gemini</SelectItem>
                             <SelectItem key="ollama" value="ollama">Local: Ollama</SelectItem>
                           </SelectContent>
                         </Select>
@@ -363,6 +370,10 @@ export function SettingsPopup() {
                       <Link href="https://help.openai.com/en/articles/4936850-where-do-i-find-my-openai-api-key" target="_blank" className="text-sm text-blue-500 hover:underline" prefetch={false}>
                         How to obtain ChatGPT API Key
                       </Link>
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2">
+                      <Label htmlFor="geminiApiKey">Gemini API Key</Label>
+                      <Input id="geminiApiKey" type="password" {...register("geminiApiKey", { required: false })} />
                     </div>
                   </CardContent>
                 </Card>

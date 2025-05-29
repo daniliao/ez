@@ -6,7 +6,6 @@ import { getErrorMessage, getZedErrorMessage } from "@/lib/utils";
 export async function POST(request: Request) {
     try {
         const jsonRequest = await request.json();
-        console.log(jsonRequest);
         const validationResult = databaseAuthorizeChallengeRequestSchema.safeParse(jsonRequest); // validation
         if (validationResult.success === true) {
             const authChallengeRequest = validationResult.data;

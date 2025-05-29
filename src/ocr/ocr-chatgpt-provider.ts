@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 
 export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Record|null,  updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<AIResultEventType> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
+    const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
 
     return new Promise ((resolve, reject) => {
         chatContext.sendMessage({
@@ -40,7 +41,8 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                     resolve(result);
                 }
             },
-            providerName: parseAIProvider
+            providerName: parseAIProvider,
+            modelName: parseModelName
         });
     });
 }    

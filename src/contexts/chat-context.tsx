@@ -3,6 +3,7 @@ import { CreateMessage, Message } from 'ai/react';
 import { nanoid } from 'nanoid';
 import { createOpenAI, openai } from '@ai-sdk/openai';
 import { ollama, createOllama } from 'ollama-ai-provider';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { CallWarning, convertToCoreMessages, FinishReason, streamText } from 'ai';
 import { ConfigContext } from '@/contexts/config-context';
 import { toast } from 'sonner';
@@ -129,6 +130,7 @@ export type ChatContextType = {
     agentContext: AgentContext | null;
     setAgentContext: (value: AgentContext) => void;
     setRecordsLoaded: (value: boolean) => void;
+    aiDirectCall: (messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) => void;
     sendMessage: (msg: CreateMessageEnvelope, includeExistingMessagesAsContext?: boolean) => void;
     sendMessages: (msg: CreateMessagesEnvelope, includeExistingMessagesAsContext?: boolean) => void;
     autoCheck: (messages: MessageEx[], providerName?: string, modelName?: string) => void;
@@ -164,9 +166,9 @@ export const ChatContext = createContext<ChatContextType>({
     stopAgent: () => {},
     crosscheckAnswers: true,
     setCrosscheckAnswers: (value: boolean) => {},
-    crosscheckModel: 'llama3.1:latest',
+    crosscheckModel: 'chatgpt-4o-latest',
     setCrosscheckModel: (value: string) => {},
-    crosscheckProvider: 'ollama',
+    crosscheckProvider: 'chatgpt',
     setCrosscheckProvider: (value: string) => {},
     crossCheckResult: null,
     setCrossCheckResult: (value: CrossCheckResultType | null) => {},
@@ -174,6 +176,7 @@ export const ChatContext = createContext<ChatContextType>({
     agentContext: null,
     setAgentContext: (value: AgentContext) => {},
     setRecordsLoaded: (value: boolean) => {},
+    aiDirectCall: (messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) => {},
     autoCheck: (messages: MessageEx[], providerName?, modelName?: string) => {},
     sendMessage: (msg: CreateMessageEnvelope, includeExistingMessagesAsContext: boolean = true) => {},
     sendMessages: (msg: CreateMessagesEnvelope, includeExistingMessagesAsContext: boolean = true) => {},
@@ -216,8 +219,8 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
     const [isCrossChecking, setIsCrossChecking] = useState(false);
     const [crossCheckResult, setCrossCheckResult] = useState<CrossCheckResultType | null>(null);
     const [crosscheckAnswers, setCrosscheckAnswers] = useState(process.env.NEXT_PUBLIC_CHAT_CROSSCHECK_DISABLE ? false : true);
-    const [crosscheckModel, setCrosscheckModel] = useState('llama3.1:latest');
-    const [crosscheckProvider, setCrosscheckProvider] = useState('ollama');
+    const [crosscheckModel, setCrosscheckModel] = useState('chatgpt-4o-latest');
+    const [crosscheckProvider, setCrosscheckProvider] = useState('chatgpt');
 
     const [areRecordsLoaded, setRecordsLoaded] = useState(false);
     const [chatCustomPromptVisible, setChatCustomPromptVisible] = useState(false);
@@ -293,7 +296,10 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
             providerName = await config?.getServerConfig('llmProviderChat') as string;
         }
 
+
         setProviderName(providerName);
+
+        console.log('AI Provider: ', providerName, modelName);
 
         if (providerName === 'ollama') {
             let ollamaBaseUrl = await config?.getServerConfig('ollamaUrl') as string;
@@ -319,6 +325,11 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
                 apiKey: await config?.getServerConfig('chatGptApiKey') as string
             })
             return aiProvider.chat(modelName ? modelName : 'chatgpt-4o-latest')   //gpt-4o-2024-05-13
+        } else if (providerName === 'gemini') {
+            const aiProvider = createGoogleGenerativeAI({                
+                apiKey: await config?.getServerConfig('geminiApiKey') as string
+            })
+            return aiProvider.chat(modelName ? modelName : 'gemini-2.5-pro-preview-05-06')
         } else {
             toast.error('Unknown AI provider ' + providerName);
             throw new Error('Unknown AI provider ' + providerName);
@@ -340,7 +351,8 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
             const result = await streamText({
                 model: await aiProvider(providerName, modelName),
                 messages: convertToCoreMessages(messagesToSend),
-                maxTokens: process.env.NEXT_PUBLIC_MAX_OUTPUT_TOKENS ? parseInt(process.env.NEXT_PUBLIC_MAX_OUTPUT_TOKENS) : 4096 * 2,
+                temperature: process.env.NEXT_PUBLIC_CHAT_TEMPERATURE && modelName !== 'o1' ? parseFloat(process.env.NEXT_PUBLIC_CHAT_TEMPERATURE) : 1.0,
+//                maxTokens: process.env.NEXT_PUBLIC_MAX_OUTPUT_TOKENS ? parseInt(process.env.NEXT_PUBLIC_MAX_OUTPUT_TOKENS) : 4096 * 2, - there's a config discrepancy with o3
                 onFinish: async (e) =>  {
                     resultMessage.finished = true;
                     setIsCrossChecking(false);
@@ -504,7 +516,8 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
             const result = await streamText({
                 model: await aiProvider(providerName, modelName),
                 messages: convertToCoreMessages(messagesToSend),
-                maxTokens: process.env.NEXT_PUBLIC_MAX_OUTPUT_TOKENS ? parseInt(process.env.NEXT_PUBLIC_MAX_OUTPUT_TOKENS) : 4096 * 2,
+                temperature: process.env.NEXT_PUBLIC_CHAT_TEMPERATURE && modelName !== 'o1' ? parseFloat(process.env.NEXT_PUBLIC_CHAT_TEMPERATURE) : 1.0,
+                //maxTokens: process.env.NEXT_PUBLIC_MAX_OUTPUT_TOKENS ? parseInt(process.env.NEXT_PUBLIC_MAX_OUTPUT_TOKENS) : 4096 * 2, - there's a config discrepancy with o3
                 onFinish: async (e) =>  {
                     try {
                         await aggregateStats({
@@ -647,8 +660,9 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
         lastRequestStat,
         aggregatedStats,
         crossCheckResult,
-        setCrossCheckResult,
         autoCheck,
+        aiDirectCall,
+        setCrossCheckResult,
         agentContext,
         setAgentContext,
         startAgent,

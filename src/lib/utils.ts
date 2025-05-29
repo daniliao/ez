@@ -142,3 +142,14 @@ export function findCodeBlocks(block: string, singleBlockMode = true) {
     blocks
   }
 }
+
+export function convertRecordIdsToLinks(text: string): string {
+  // Match patterns like "Record Id: 1, 2, 5" or "RecordIds: 1,2,5" (case insensitive)
+  const recordIdPattern = /Record\s*Id(?:s)?:?\s*([\d,\s]+)/gi;
+  
+  return text.replace(recordIdPattern, (match, ids) => {
+    // Clean up the IDs by removing extra spaces
+    const cleanIds = ids.replace(/\s+/g, '');
+    return `[${match}](#records-${cleanIds})`;
+  });
+}

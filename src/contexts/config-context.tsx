@@ -24,6 +24,7 @@ export function coercedVal(val: any, defaultVal: any = ''): ConfigSupportedValue
 
 export const ENV_PROVIDED_CONFIG: Record<string, any> = {
   chatGptApiKey: process.env.NEXT_PUBLIC_CHAT_GPT_API_KEY,
+  geminiApiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
   displayAttachmentPreviews: process.env.NEXT_PUBLIC_DISPLAY_ATTACHMENT_PREVIEWS,
   ocrProvider: process.env.NEXT_PUBLIC_OCR_PROVIDER,
   ocrLanguage: process.env.NEXT_PUBLIC_OCR_LANGUAGE,
@@ -32,6 +33,7 @@ export const ENV_PROVIDED_CONFIG: Record<string, any> = {
   llmProviderChat: process.env.NEXT_PUBLIC_LLM_PROVIDER_CHAT,
   llmModelChat: process.env.NEXT_PUBLIC_LLM_MODEL_CHAT,
   llmProviderParse: process.env.NEXT_PUBLIC_LLM_PROVIDER_PARSE,
+  llmModelParse: process.env.NEXT_PUBLIC_LLM_MODEL_PARSE,
   llmProviderRemovePII: process.env.NEXT_PUBLIC_LLM_PROVIDER_REMOVE_PII,
   piiGeneralData: process.env.NEXT_PUBLIC_PII_GENERAL_DATA,
   autoLoadFolderContext: process.env.NEXT_PUBLIC_AUTO_LOAD_PATIENT_CONTEXT,

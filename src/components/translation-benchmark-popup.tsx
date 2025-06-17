@@ -75,7 +75,7 @@ const TranslationBenchmarkPopup: React.FC<Props> = ({ open, setOpen }) => {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[1000px]">
                 <DialogHeader>
                     <DialogTitle>Translation Benchmarking</DialogTitle>
                     <DialogDescription>

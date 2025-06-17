@@ -200,16 +200,21 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
         </div>
         {record.extra?.find(e => e.type === 'Reference record Ids')?.value && (
           <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-            Translated from: <Button variant="link" className="p-0 h-auto" onClick={() => {
-              const refRecord = recordContext?.records.find(r => r.id?.toString() === record.extra?.find(e => e.type === 'Reference record Ids')?.value);
-              if (refRecord) {
-                recordContext?.setCurrentRecord(refRecord);
-                recordContext?.setRecordEditMode(true);
-              }
-            }}>
-              {recordContext?.records.find(r => r.id?.toString() === record.extra?.find(e => e.type === 'Reference record Ids')?.value)?.title || 
-               `Record #${record.extra?.find(e => e.type === 'Reference record Ids')?.value}`}
-            </Button>
+            Translated from: {(() => {
+              const refId = record.extra?.find(e => e.type === 'Reference record Ids')?.value;
+              const refRecord = recordContext?.records.find(r => r.id?.toString() === refId);
+              return (
+                <a
+                  href={`#records-${refId}`}
+                  className="underline hover:text-blue-500 cursor-pointer"
+                  onClick={e => {
+                    // Let the hash change trigger the popup; no edit mode
+                  }}
+                >
+                  {refRecord?.title || `Record #${refId}`}
+                </a>
+              );
+            })()}
           </div>
         )}
         <Tabs defaultValue="text" className="w-full text-sm">

@@ -46,7 +46,13 @@ export default function RecordLinkHandler() {
   }, [recordContext?.records]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      setIsOpen(open);
+      if (!open && window.location.hash.startsWith('#records-')) {
+        // Remove the hash from the URL after closing the popup
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Referenced Records</DialogTitle>

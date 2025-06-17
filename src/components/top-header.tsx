@@ -5,7 +5,7 @@ import RecordForm from "./record-form";
 import { FolderContext } from "@/contexts/folder-context";
 import { Suspense, useContext, useEffect, useState } from "react";
 import { Chat } from "./chat";
-import { Edit3Icon, FileIcon, FolderIcon, FolderOpen, FoldersIcon, FormInputIcon, ImportIcon, KeyIcon, LogOutIcon, LogsIcon, MenuIcon, MenuSquareIcon, MessageCircleIcon, PlusIcon, SaveAllIcon, Settings2Icon, SettingsIcon, Share2Icon, Wand2 } from "lucide-react";
+import { Edit3Icon, FileIcon, FolderIcon, FolderOpen, FoldersIcon, FormInputIcon, ImportIcon, KeyIcon, LanguagesIcon, LogOutIcon, LogsIcon, MenuIcon, MenuSquareIcon, MessageCircleIcon, PlusIcon, SaveAllIcon, Settings2Icon, SettingsIcon, Share2Icon, Wand2 } from "lucide-react";
 import { DatabaseContext } from "@/contexts/db-context";
 import { toast } from "sonner";
 import { useTheme } from 'next-themes';
@@ -28,6 +28,7 @@ import { TermsContext } from "@/contexts/terms-context";
 import { SaaSContext } from "@/contexts/saas-context";
 import FeedbackWidget from "./feedback-widget";
 import { SaaSContextLoader } from "./saas-context-loader";
+import TranslationBenchmarkPopup from "./translation-benchmark-popup";
 
 export default function TopHeader() {
     const folderContext = useContext(FolderContext);
@@ -43,6 +44,7 @@ export default function TopHeader() {
     const currentTheme = (theme === 'system' ? systemTheme : theme)
     const [commandDialogOpen, setCommandDialogOpen] = useState(false);
     const [chatCommandsOpen, setChatCommandsOpen] = useState(false);
+    const [translationBenchmarkOpen, setTranslationBenchmarkOpen] = useState(false);
     const { openFilePicker, filesContent, loading } = useFilePicker({
       accept: '.zip',
       readAs: 'ArrayBuffer',
@@ -107,6 +109,7 @@ export default function TopHeader() {
                     <CommandItem key="cmd-open-chat" className="cursor-pointer text-xs"  onSelect={(e) => { chatContext?.setChatOpen(true); }}><MessageCircleIcon /> Open AI Chat</CommandItem>
 
                     {!dbContext?.acl || dbContext.acl.role === 'owner' ? (<CommandItem key="cmd-share" className="cursor-pointer text-xs" onSelect={(v) => { keyContext.setSharedKeysDialogOpen(true);  }}><Share2Icon className="w-6 h-6" />  Shared Keys</CommandItem>) : null}
+                    <CommandItem key="cmd-translation-benchmark" className="cursor-pointer text-xs" onSelect={(v) => { setTranslationBenchmarkOpen(true); }}><LanguagesIcon className="w-6 h-6" /> Translation benchmarking report</CommandItem>
                   </CommandGroup>
                   <CommandGroup heading="Export & import">
                     <CommandItem key="cmd-export" className="cursor-pointer text-xs" onSelect={(v) => { recordContext?.exportRecords(); }}><SaveAllIcon className="w-6 h-6" /> Export filtered records</CommandItem>
@@ -128,6 +131,7 @@ export default function TopHeader() {
             </CommandDialog>
             
         </div>
+        <TranslationBenchmarkPopup open={translationBenchmarkOpen} setOpen={setTranslationBenchmarkOpen} />
       </div>
     );
 }

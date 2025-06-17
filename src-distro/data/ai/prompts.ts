@@ -8,7 +8,31 @@ type PromptContext = {
 }
 const itemSchema = zodToJsonSchema(recordItemSchema);
 
+
+export type TranslationBenchmarkContext = {
+    originalRecord: Record;
+    humanTranslationRecord: Record;
+    aiTranslationRecord: Record;
+}
 export const prompts = {
+    
+    translationBenchmark: ({ originalRecord, humanTranslationRecord, aiTranslationRecord }: TranslationBenchmarkContext) => {
+        return `Please create a translation comparison report. 
+                This is the original record: ${originalRecord.text}
+                
+                This is the human translation: ${humanTranslationRecord.text}
+                
+                This is the AI translation: ${aiTranslationRecord.text}
+                
+                Please analyze and provide:
+                1. A table comparing key differences between translations
+                2. Calculate overall % fit of human and AI translations vs original
+                3. Highlight any significant meaning changes or errors
+                4. Provide recommendations for improving both translations
+                
+                Please format the response in markdown.`;
+    },
+
     recordParseMultimodal: (context: PromptContext) => {
         return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, please parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others. \
                 First: JSON should be all in original language. \

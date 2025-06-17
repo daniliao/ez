@@ -1,15 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { PaperclipIcon, Trash2Icon } from "./icons";
 import { DisplayableDataObject, Record } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState } from "react";
-import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon } from "lucide-react";
+import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
-import { MessageCircleIcon } from '@/components/chat'
 import Markdown from "react-markdown";
 import { prompts } from "@/data/ai/prompts";
 import remarkGfm from 'remark-gfm'
-import { Accordion, AccordionTrigger, AccordionContent, AccordionItem } from "./ui/accordion";
 import styles from './record-item.module.css'
 import { labels } from '@/data/ai/labels';
 import DataLoader from './data-loader';
@@ -23,6 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import ZoomableImage from './zoomable-image';
 import { convertRecordIdsToLinks } from '@/lib/utils';
+import showdown from 'showdown';
+import { Accordion, AccordionTrigger, AccordionContent, AccordionItem } from "./ui/accordion";
 
 //import RecordItemJson from "@/components/record-item-json";
 //import RecordItemExtra from '@/components/record-item-extra';
@@ -121,6 +120,19 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
     
   }, [displayAttachmentPreviews, record, isVisible]);
 
+  const downloadAsHtml = (text: string | undefined, filename: string) => {
+    if (!text) return;
+    const converter = new showdown.Converter({ tables: true, completeHTMLDocument: true, openLinksInNewWindow: true });
+    converter.setFlavor('github');
+    const htmlContent = converter.makeHtml(text);
+    const htmlElement = document.createElement('a');
+    const fileHtml = new Blob([htmlContent], { type: 'text/html' });
+    htmlElement.href = URL.createObjectURL(fileHtml);
+    htmlElement.download = filename + `.html`;
+    document.body.appendChild(htmlElement);
+    htmlElement.click();
+    document.body.removeChild(htmlElement);
+  }
 
   return (
       record.parseInProgress ? (
@@ -247,7 +259,28 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
               {record.text ? (
                   <Accordion type="single" collapsible className="w-full">
                   <AccordionItem value="item-1">
-                    <AccordionTrigger>Full text extracted from files</AccordionTrigger>
+                    <AccordionTrigger className="flex justify-between">
+                      <span>Full text extracted from files</span>
+                      <div className="flex gap-2">
+                        <Button size="icon" variant="ghost" title="Edit text" onClick={(e) => {
+                          e.stopPropagation(); // Prevent accordion from toggling
+                          if(record.parseInProgress) { 
+                            toast.info('Please wait until record is successfully parsed') 
+                          } else {  
+                            recordContext?.setCurrentRecord(record);  
+                            recordContext?.setRecordEditMode(true); 
+                          }
+                        }}>
+                          <PencilIcon className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Download as HTML" onClick={(e) => {
+                          e.stopPropagation(); // Prevent accordion from toggling
+                          downloadAsHtml(record.text, `record-${record.id}-text`);
+                        }}>
+                          <DownloadIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </AccordionTrigger>
                     <AccordionContent>
                       <Markdown className={styles.markdown} remarkPlugins={[remarkGfm]}>
                         {convertRecordIdsToLinks(record.text)}
@@ -280,11 +313,14 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
             </TabsContent>
         </Tabs>
         <div ref={thisElementRef} className="mt-2 flex items-center gap-2">
-          <Button size="icon" variant="ghost" title="Edit record">
-            <PencilIcon className="w-4 h-4" onClick={() => { if(record.parseInProgress) { toast.info('Please wait until record is successfully parsed') } else {  recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true); } }} />
+          <Button size="icon" variant="ghost" title="Edit record" onClick={() => { if(record.parseInProgress) { toast.info('Please wait until record is successfully parsed') } else {  recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true); } }}>
+            <PencilIcon className="w-4 h-4" />
           </Button>        
-          <Button size="icon" variant="ghost" title="Add attachments">
-            <PaperclipIcon className="w-4 h-4"  onClick={() => { if(record.parseInProgress) { toast.info('Please wait until record is successfully parsed') } else {   recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true);}  }} />
+          <Button size="icon" variant="ghost" title="Add attachments" onClick={() => { if(record.parseInProgress) { toast.info('Please wait until record is successfully parsed') } else {   recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true);}  }}>
+            <PaperclipIcon className="w-4 h-4" />
+          </Button>
+          <Button size="icon" variant="ghost" title="Download record as HTML" onClick={() => downloadAsHtml(record.text || record.description, `record-${record.id}`)}>
+            <DownloadIcon className="w-4 h-4" />
           </Button>
           <AlertDialog>
             <AlertDialogTrigger>
@@ -311,34 +347,10 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                 <RecordItemCommands record={record} folder={folderContext?.currentFolder} open={commandsOpen} setOpen={setCommandsOpen} />
             </Button>                
           ): ((record.attachments && record.attachments.length || record.transcription) ? (<Button className="h-6 text-xs" variant="ghost" title="Parse again">
-            Try parse again: <RefreshCwIcon className="ml-3 w-4 h-4" onClick={() => { recordContext?.parseRecord(record); }}/>
+            Try parse again: <RefreshCw className="ml-3 w-4 h-4" onClick={() => { recordContext?.parseRecord(record); }}/>
             </Button>) : null) }      
         </div>
       </div>
     )
   );
-}
-
-
-function RefreshCwIcon(props: { children: React.ReactNode; className?: string; node?: any }) {
-  const {children, className, node, ...rest} = props
-  return (
-    <svg
-      {...rest}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M8 16H3v5" />
-    </svg>
-  )
 }

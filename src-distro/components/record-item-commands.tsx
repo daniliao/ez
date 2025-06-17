@@ -1,7 +1,7 @@
 "use client"
 import React, { useContext } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../src/components/ui/accordion';
-import { Folder, Record } from '@/data/client/models';
+import { DataLoadingStatus, Folder, Record } from '@/data/client/models';
 import { labels } from '@/data/ai/labels';
 import { formatString } from 'typescript-string-operations';
 import Markdown from 'react-markdown';
@@ -159,6 +159,16 @@ const RecordItemCommands: React.FC<Props> = ({ record, folder, open, setOpen }) 
                             role: 'user',
                             createdAt: new Date(),
                             content: prompts.translateRecord({ record, language: item.name }),
+                          }, 
+                          onResult: async (result) => {
+                            if(result) {
+                                try {
+                                    recordContext?.setOperationStatus(DataLoadingStatus.Loading);
+                                    await recordContext?.updateRecordFromText(result.content, null, true); // add as new record the translation
+                                } finally {
+                                    recordContext?.setOperationStatus(DataLoadingStatus.Success);
+                                }
+                                }
                           }
                         });
               

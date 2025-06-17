@@ -179,7 +179,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, ref }) => {
                                     <SaveIcon />
                                 )}
                             </Button>
-                            <Button title="Save message as new record" variant="ghost" size="icon" onClick={() => {
+                            <Button title="Download message as HTML report" variant="ghost" size="icon" onClick={() => {
                                 chatContext.downloadMessage(message, `report-${message.id}`, 'html');
                             }}><DownloadIcon /></Button>
                         </div>

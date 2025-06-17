@@ -485,7 +485,7 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
             role: 'assistant',
             visibility: MessageVisibility.Visible
         }
-        try {
+//        try {
             let messagesToSend = messages;
             if (messagesToSend.length > 0) {
                 if (!messagesToSend[messagesToSend.length - 1].type)
@@ -565,12 +565,12 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
             setIsStreaming(false);
             setMessages([...messagesToSend, resultMessage])
             setVisibleMessages(filterVisibleMessages([...messagesToSend, resultMessage]));
-        } catch (e) {
-            const errMsg = 'Error while streaming AI response: ' + e;
-            if (onResult) onResult(resultMessage, { finishReason: 'error', text: errMsg, usage: null });
-            setIsStreaming(false);
-            toast.error(errMsg);
-        }
+        // } catch (e) {
+        //     const errMsg = 'Error while streaming AI response: ' + e;
+        //     if (onResult) onResult(resultMessage, { finishReason: 'error', text: errMsg, usage: null });
+        //     setIsStreaming(false);
+        //     toast.error(errMsg);
+        // }
     }
 
     const prepareMessage = (msg: CreateMessageEx | MessageEx, setMessages: React.Dispatch<React.SetStateAction<MessageEx[]>>, messages: MessageEx[], setLastMessage: React.Dispatch<React.SetStateAction<MessageEx | null>>) => {

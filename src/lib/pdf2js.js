@@ -174,7 +174,7 @@ async function doc_render(pdfDocument, pageNo, canvasFactory, conversion_config)
 
   // Convert the canvas to an image buffer.
   console.log(canvasAndContext);
-  let image = canvasAndContext.canvas.toDataURL();
+  let image = canvasAndContext.canvas.toDataURL(conversion_config.image_format || 'image/png');
 
   return image;
 } // doc_render

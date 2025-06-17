@@ -15,7 +15,7 @@ import {
 import { SetStateAction, use, useCallback, useContext, useEffect, useState } from "react";
 import { EncryptedAttachment, Folder, Record } from "@/data/client/models";
 import { Credenza, CredenzaContent, CredenzaDescription, CredenzaHeader, CredenzaTitle, CredenzaTrigger } from "./credenza";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, EyeIcon, CodeIcon } from "lucide-react";
 import { useForm, useFormContext } from "react-hook-form";
 import { FolderContext } from "@/contexts/folder-context";
 import { RecordContext } from "@/contexts/record-context";
@@ -24,10 +24,16 @@ import { toast } from "sonner";
 import { EncryptedAttachmentApiClient } from "@/data/client/encrypted-attachment-api-client";
 import { ConfigContext } from "@/contexts/config-context";
 import { DatabaseContext } from "@/contexts/db-context";
-import { MicIcon } from "lucide-react"; // Add this import statement
+import { MicIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 import { record } from "zod";
 import { SaaSContext } from "@/contexts/saas-context";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import type { Editor } from '@monaco-editor/react';
+
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 const FileSvgDraw = () => {
   return (
@@ -78,7 +84,8 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
   const [removeFiles, setRemoveFiles] = useState<UploadedFile[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [chatGptApiKey, setChatGptApiKey] = useState<string>('');
-
+  const [editorContent, setEditorContent] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<string>("edit");
 
   const dropZoneConfig = {
     maxFiles: 20,
@@ -86,13 +93,11 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
     multiple: true,
   };
 
-  
-
-    const { handleSubmit, register, reset, setError, getValues, setValue, formState: { errors } } = useForm({
-      defaultValues: {
-        note: "",
-        noteType: "visit"
-      }
+  const { handleSubmit, register, reset, setError, getValues, setValue, formState: { errors } } = useForm({
+    defaultValues: {
+      note: "",
+      noteType: "visit"
+    }
   });  
 
   useEffect(() => {
@@ -110,6 +115,7 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
       }) as Tag[]);
       setTranscription(recordContext?.currentRecord?.transcription as string);
       setValue("note", recordContext?.currentRecord?.description as string);
+      setEditorContent(recordContext?.currentRecord?.text || "");
       let existingFiles:UploadedFile[] = []
       if (recordContext?.currentRecord) {
         let idx = 0
@@ -130,8 +136,6 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
   }, [recordContext?.currentRecord, recordContext?.recordEditMode, setValue]);
   
   const onSubmit = async (data: any) => {
-    // Handle form submission
-
     if (!data.note && !transcription && files?.length == 0)
     {
       toast.error('Please upload at least one file or enter note text description');
@@ -179,6 +183,7 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
         if (recordContext?.currentRecord && recordContext?.recordEditMode) { // edit mode
           pr = new Record(recordContext?.currentRecord);
           pr.description = data.note;
+          pr.text = editorContent;
           pr.transcription = transcription;
           pr.attachments = uploadedAttachments;
           pr.updatedAt = getCurrentTS();
@@ -195,6 +200,7 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
               type: 'note',
               tags: tags ? tags.map((tag) => tag.text) : [],
               description: data.note,
+              text: editorContent,
               transcription: transcription,
               updatedAt: getCurrentTS(),
               createdAt: getCurrentTS(),
@@ -214,6 +220,7 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
                         type: 'note',
                         tags: tags ? tags.map((tag) => tag.text) : [],
                         description: data.note,
+                        text: editorContent,
                         transcription: transcription,
                         updatedAt: getCurrentTS(),
                         createdAt: getCurrentTS(),
@@ -239,6 +246,7 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
                     type: 'note',
                     tags: tags ? tags.map((tag) => tag.text) : [],
                     description: data.note,
+                    text: editorContent,
                     transcription: transcription,
                     updatedAt: getCurrentTS(),
                     createdAt: getCurrentTS(),
@@ -301,7 +309,7 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
           {mode === RecordEditMode.VoiceRecorder ? (<MicIcon className="w-6 h-6" />) : (<PlusIcon className="w-6 h-6" />)}
         </Button>
       </CredenzaTrigger>
-      <CredenzaContent className="sm:max-w-[600px] bg-white dark:bg-zinc-950">
+      <CredenzaContent className="sm:max-w-[1000px] bg-white dark:bg-zinc-950">
         <CredenzaHeader>
           <CredenzaTitle>{folder?.displayName()}</CredenzaTitle>
         </CredenzaHeader>
@@ -313,14 +321,41 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
             }} />) : null }
             {recordContext?.currentRecord && recordContext?.recordEditMode ? (
               <div>
-                <div className="flex items-center gap-4 resize-x">
-                  <Textarea
-                    className="block w-full resize-none border-none focus:ring-0 h-auto m-2"
-                    placeholder="Add a new note..."
-                    rows={5}
-                    {...register("note", { required: false })}
-                  />
-                </div>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="edit" className="flex gap-2">
+                      <CodeIcon className="h-4 w-4" />
+                      Edit Markdown
+                    </TabsTrigger>
+                    <TabsTrigger value="preview" className="flex gap-2">
+                      <EyeIcon className="h-4 w-4" />
+                      Preview
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="edit" className="min-h-[300px] border rounded-md">
+                    <MonacoEditor
+                      defaultLanguage="markdown"
+                      theme="vs-dark"
+                      value={editorContent}
+                      onChange={(value: string | undefined) => setEditorContent(value || "")}
+                      options={{
+                        minimap: { enabled: false },
+                        lineNumbers: 'off',
+                        wordWrap: 'on',
+                        wrappingIndent: 'indent',
+                        scrollBeyondLastLine: false,
+                      }}
+                      className="min-h-[300px]"
+                    />
+                  </TabsContent>
+                  <TabsContent value="preview" className="border rounded-md p-4 overflow-hidden">
+                    <div className="prose dark:prose-invert max-w-none overflow-y-auto" style={{ maxHeight: '50vh' }}>
+                      <Markdown remarkPlugins={[remarkGfm]}>
+                        {editorContent}
+                      </Markdown>
+                    </div>
+                  </TabsContent>
+                </Tabs>
                 <div className="flex items-center gap-4 p-2">
                   <TagInput
                       placeholder="Enter a topic"

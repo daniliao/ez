@@ -234,10 +234,10 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     };
 
     const updateRecordFromText =  async (text: string, record: Record | null = null, allowNewRecord = true): Promise<Record|null> => {
+        let recordMarkdown = "";
         if (text.indexOf('```json') > -1) {
           const codeBlocks = findCodeBlocks(text.trimEnd().endsWith('```') ? text : text + '```', false);
           let recordJSON = [];
-          let recordMarkdown = "";
           if (codeBlocks.blocks.length > 0) {
               for (const block of codeBlocks.blocks) {
                   if (block.syntax === 'json') {
@@ -300,7 +300,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 updatedAt: getCurrentTS(),
                 eventDate: metaData.eventDate || getCurrentTS(),
                 json: JSON.stringify(metaData),
-                text: text,
+                text: recordMarkdown ? recordMarkdown : text,
                 attachments: '[]',
                 checksum: '',
                 checksumLastParsed: '',

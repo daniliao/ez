@@ -106,11 +106,11 @@ export const prompts = {
         \r\n' + JSON.stringify(context.record?.json) + '```'
     },
     translateRecord: (context: PromptContext & { language: string}) => {
-        return 'Translate this health record to ' + context.language + ' language. Be as exact as possible. Do not add any custom interpretations over medical terms. Return translated JSON plus translated markdown: \r\n\r\n```json\
+        return 'Translate this health record to ' + context.language + ' language. Be as exact as possible. Do not add any custom interpretations over medical terms. Return full markdown text and full json text in single message, do not shorten anytrhing. Return translated JSON plus translated markdown: \r\n\r\n```json\
         '+ JSON.stringify(context.record?.json) + "```\r\n\r\n```markdown\r\n" + context.record?.text + '```';
     },
     translateRecordText: (context: PromptContext & { language: string}) => {
-        return 'Translate this health record to ' + context.language + ' language, Be as exact as possible. Do not add any custom interpretations over medical terms: ' + context.record?.description + ' ' + context.record?.text;
+        return 'Translate this health record to ' + context.language + ' language, Be as exact as possible. Do not add any custom interpretations over medical terms.  Return full text, do not shorten anytrhing. Return full translated markdown and JSON ' + context.record?.description + ' ' + context.record?.text;
     },
     recordSummary: (context: PromptContext) => {
         return 'Summarize the health result data below in one sentence: ' + context.record?.text

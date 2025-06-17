@@ -164,14 +164,15 @@ const RecordItemCommands: React.FC<Props> = ({ record, folder, open, setOpen }) 
                             if(result) {
                                 try {
                                     recordContext?.setOperationStatus(DataLoadingStatus.Loading);
-                                    await recordContext?.updateRecordFromText(result.content, null, true); // add as new record the translation
+                                    await recordContext?.updateRecordFromText(result.content, null, true, [
+                                        { type: 'Reference record Ids', value: record.id?.toString() || '' }
+                                    ]); // add as new record the translation with reference
                                 } finally {
                                     recordContext?.setOperationStatus(DataLoadingStatus.Success);
                                 }
-                                }
+                            }
                           }
                         });
-              
                     }} className="text-xs"><LanguagesIcon /> Translate to {item.name} ({item.country})</CommandItem>
                 ))}
             </CommandGroup>

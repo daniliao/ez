@@ -68,7 +68,7 @@ export type RecordContextType = {
     operationStatus: DataLoadingStatus;
     setOperationStatus: (status: DataLoadingStatus) => void;
 
-    updateRecordFromText: (text: string, record: Record | null, allowNewRecord: boolean) => Promise<Record|null>;
+    updateRecordFromText: (text: string, record?: Record | null, allowNewRecord?: boolean, extra?: { type: string, value: string }[]) => Promise<Record | null>;
     getAttachmentData: (attachmentDTO: EncryptedAttachmentDTO, type: AttachmentFormat) => Promise<string|Blob>;
     downloadAttachment: (attachment: EncryptedAttachmentDTO, useCache: boolean) => void;
     convertAttachmentsToImages: (record: Record, statusUpdates: boolean) => Promise<DisplayableDataObject[]>;
@@ -93,6 +93,7 @@ export type RecordContextType = {
 
     exportRecords: () => void;
     importRecords: (zipFileInput: ArrayBuffer) => void;
+    setRecordExtra: (record: Record, type: string, value: string) => Promise<void>;
 }
 
 export const RecordContext = createContext<RecordContextType | null>(null);
@@ -233,98 +234,128 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         }
     };
 
-    const updateRecordFromText =  async (text: string, record: Record | null = null, allowNewRecord = true): Promise<Record|null> => {
+    const updateRecordFromText = async (text: string, record: Record | null = null, allowNewRecord = true, extra?: { type: string, value: string }[]): Promise<Record|null> => {
         let recordMarkdown = "";
-        if (text.indexOf('```json') > -1) {
-          const codeBlocks = findCodeBlocks(text.trimEnd().endsWith('```') ? text : text + '```', false);
-          let recordJSON = [];
-          if (codeBlocks.blocks.length > 0) {
-              for (const block of codeBlocks.blocks) {
-                  if (block.syntax === 'json') {
-                      const jsonObject = JSON.parse(jsonrepair(block.code));
-                      if (Array.isArray(jsonObject)) {
-                          for (const recordItem of jsonObject) {
-                              recordJSON.push(recordItem);
-                          }
-                      } else recordJSON.push(jsonObject);
-                  }
+        try {
+            if (text.indexOf('```json') > -1) {
+                const codeBlocks = findCodeBlocks(text.trimEnd().endsWith('```') ? text : text + '```', false);
+                let recordJSON = [];
+                if (codeBlocks.blocks.length > 0) {
+                    for (const block of codeBlocks.blocks) {
+                        if (block.syntax === 'json') {
+                            const jsonObject = JSON.parse(jsonrepair(block.code));
+                            if (Array.isArray(jsonObject)) {
+                                for (const recordItem of jsonObject) {
+                                    recordJSON.push(recordItem);
+                                }
+                            } else recordJSON.push(jsonObject);
+                        }
 
-                  if (block.syntax === 'markdown') {
-                      recordMarkdown += block.code;
-                  }
-              }
-              if (recordJSON.length > 0) {
-                const hasError = recordJSON.find(item => item.error);
-                if (hasError) {
-                  toast.error('Uploaded file is not valid health data. Record will be deleted: ' + hasError.error);
-                  deleteRecord(record as Record);
-                  auditContext.record({ eventName: 'invalidRecord',  recordLocator: JSON.stringify([{ recordIds: [record?.id]}])});
-                  return record;
-                }
-              }
-              const discoveredEventDate = getTS(new Date(recordJSON.length > 0 ? recordJSON.find(item => item.test_date)?.test_date || recordJSON.find(item => item.admission_date)?.admission_date : record?.createdAt));
-              const discoveredType = recordJSON.length > 0 ? recordJSON.map(item => item.subtype ? item.subtype : item.type).join(", ") : 'note';
-              if (record) {
-                  record = new Record({ ...record, json: recordJSON, text: recordMarkdown, type: discoveredType, eventDate: discoveredEventDate } as Record);
-                  updateRecord(record);
-              } else {
-                  if (allowNewRecord && folderContext?.currentFolder?.id) { // create new folder Record
-                    record = new Record({ folderId: folderContext?.currentFolder?.id, type: discoveredType, createdAt: getCurrentTS(), updatedAt: getCurrentTS(), json: recordJSON, text: recordMarkdown, eventDate: discoveredEventDate } as Record);
-                    updateRecord(record);
-                  }
-              }
-              console.log('JSON repr: ', recordJSON);
-          } 
-      } else { // create new folder Record for just plain text
-        if (allowNewRecord && folderContext?.currentFolder?.id) { // create new folder Record
-          return  new Promise<Record | null>((resolve) => {
-            chatContext.aiDirectCall([{ role: 'user', content: prompts.generateRecordMetaData({ record: null, config }, text), id: nanoid() }], (result) => {
-              console.log('Meta data: ', result.content);
-              let metaData = {}
-              const codeBlocks = findCodeBlocks(result.content.endsWith('```') ? result.content : result.content + '```', false);
-              if (codeBlocks.blocks.length > 0) {
-                for (const block of codeBlocks.blocks) {
-                    if (block.syntax === 'json') {
-                        const jsonObject = JSON.parse(jsonrepair(block.code));
-                        metaData = jsonObject as RecordDTO;
+                        if (block.syntax === 'markdown') {
+                            recordMarkdown += block.code;
+                        }
                     }
+                    if (recordJSON.length > 0) {
+                        const hasError = recordJSON.find(item => item.error);
+                        if (hasError) {
+                            toast.error('Uploaded file is not valid health data. Record will be deleted: ' + hasError.error);
+                            if (record) {
+                                await deleteRecord(record);
+                                auditContext.record({ eventName: 'invalidRecord',  recordLocator: JSON.stringify([{ recordIds: [record.id]}])});
+                            }
+                            return null;
+                        }
+                    }
+                    const discoveredEventDate = getTS(new Date(recordJSON.length > 0 ? recordJSON.find(item => item.test_date)?.test_date || recordJSON.find(item => item.admission_date)?.admission_date : record?.createdAt));
+                    const discoveredType = recordJSON.length > 0 ? recordJSON.map(item => item.subtype ? item.subtype : item.type).join(", ") : 'note';
+                    if (record) {
+                        const recordDTO = record.toDTO();
+                        const updatedRecord = Record.fromDTO({
+                            ...recordDTO,
+                            json: JSON.stringify(recordJSON),
+                            text: recordMarkdown || null,
+                            type: discoveredType,
+                            eventDate: discoveredEventDate,
+                            extra: extra ? JSON.stringify([...(record.extra || []), ...extra]) : recordDTO.extra
+                        });
+                        return await updateRecord(updatedRecord);
+                    } else {
+                        if (allowNewRecord && folderContext?.currentFolder?.id) { // create new folder Record
+                            const newRecord = Record.fromDTO({
+                                folderId: folderContext?.currentFolder?.id,
+                                type: discoveredType,
+                                createdAt: getCurrentTS(),
+                                updatedAt: getCurrentTS(),
+                                json: JSON.stringify(recordJSON),
+                                text: recordMarkdown || null,
+                                eventDate: discoveredEventDate,
+                                extra: extra ? JSON.stringify(extra) : '[]',
+                                attachments: '[]',
+                                checksum: '',
+                                checksumLastParsed: ''
+                            });
+                            return await updateRecord(newRecord);
+                        }
+                    }
+                    console.log('JSON repr: ', recordJSON);
+                } 
+            } else { // create new folder Record for just plain text
+                if (allowNewRecord && folderContext?.currentFolder?.id) { // create new folder Record
+                    return new Promise<Record | null>((resolve) => {
+                        chatContext.aiDirectCall([{ role: 'user', content: prompts.generateRecordMetaData({ record: null, config }, text), id: nanoid() }], (result) => {
+                            console.log('Meta data: ', result.content);
+                            let metaData = {} as any;
+                            const codeBlocks = findCodeBlocks(result.content.endsWith('```') ? result.content : result.content + '```', false);
+                            if (codeBlocks.blocks.length > 0) {
+                                for (const block of codeBlocks.blocks) {
+                                    if (block.syntax === 'json') {
+                                        const jsonObject = JSON.parse(jsonrepair(block.code));
+                                        metaData = jsonObject;
+                                    }
+                                }
+                            }          
+                            
+                            try {
+                                const recordDTO: RecordDTO = {
+                                    folderId: folderContext?.currentFolder?.id as number,
+                                    type: 'note',
+                                    createdAt: getCurrentTS(),
+                                    updatedAt: getCurrentTS(),
+                                    eventDate: getCurrentTS(),
+                                    json: JSON.stringify(metaData),
+                                    text: recordMarkdown || text,
+                                    attachments: '[]',
+                                    checksum: '',
+                                    checksumLastParsed: '',
+                                    title: metaData.title || null,
+                                    description: metaData.summary || null,
+                                    tags: JSON.stringify(metaData.tags || []),
+                                    extra: extra ? JSON.stringify(extra) : JSON.stringify(metaData.extra || []),
+                                    transcription: null
+                                };
+                                const newRecord = Record.fromDTO(recordDTO);
+                                updateRecord(newRecord).then((updatedRecord) => {
+                                    resolve(updatedRecord);
+                                }).catch((error) => {
+                                    toast.error('Error creating record from text.');
+                                    setOperationStatus(DataLoadingStatus.Error);
+                                    resolve(null);
+                                });
+                            } catch (error) {
+                                toast.error('Error creating record from text.');
+                                setOperationStatus(DataLoadingStatus.Error);
+                                resolve(null);
+                            }
+                        }, 'chatgpt', 'gpt-4o'); // using small model for summary
+                    });
                 }
-              }          
-              
-                        
-              try {
-              const recordDTO: RecordDTO = {
-                folderId: folderContext?.currentFolder?.id as number,
-                type: 'note',
-                createdAt: getCurrentTS(),
-                updatedAt: getCurrentTS(),
-                eventDate: metaData.eventDate || getCurrentTS(),
-                json: JSON.stringify(metaData),
-                text: recordMarkdown ? recordMarkdown : text,
-                attachments: '[]',
-                checksum: '',
-                checksumLastParsed: '',
-                title: metaData.title || '',
-                description: metaData.summary || '',
-                tags: JSON.stringify(metaData.tags || []),
-                extra: JSON.stringify(metaData.extra || []),
-                transcription: ''
-              };
-              record = Record.fromDTO(recordDTO);
-              updateRecord(record);
-              resolve(record);
-            } catch (error) {
-              toast.error('Error creating record from text.');
-              setOperationStatus(DataLoadingStatus.Error);
-              resolve(null);
             }
-  
-            }, 'chatgpt', 'gpt-4o'); // using small model for summary
-
-          });
+            return null;
+        } catch (error) {
+            toast.error('Error processing text: ' + getErrorMessage(error));
+            setOperationStatus(DataLoadingStatus.Error);
+            return null;
         }
-      }
-      return record;
     }
 
     const deleteRecord = async (record: Record) => {
@@ -785,6 +816,12 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         }
       }    
 
+    const setRecordExtra = async (record: Record, type: string, value: string) => {
+        let recordEXTRA = record.extra || []
+        recordEXTRA.find(p => p.type === type) ? recordEXTRA = recordEXTRA.map(p => p.type === type ? { ...p, value } : p) : recordEXTRA.push({ type, value })
+        record = new Record({ ...record, extra: recordEXTRA });
+        await updateRecord(record);
+    }
 
     return (
         <RecordContext.Provider
@@ -823,7 +860,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                  exportRecords,
                  importRecords,
                  recordDialogOpen,
-                 setRecordDialogOpen
+                 setRecordDialogOpen,
+                 setRecordExtra
                 }}
         >
             {children}

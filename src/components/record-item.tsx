@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { DisplayableDataObject, Record } from "@/data/client/models";
+import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState } from "react";
-import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle } from "lucide-react";
+import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import Markdown from "react-markdown";
@@ -198,6 +198,20 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
           )}
           <div className="text-xs text-zinc-500 dark:text-zinc-400 flex"><CalendarIcon className="w-4 h-4" /> {record.eventDate ? record.eventDate : record.createdAt}</div>
         </div>
+        {record.extra?.find(e => e.type === 'Reference record Ids')?.value && (
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+            Translated from: <Button variant="link" className="p-0 h-auto" onClick={() => {
+              const refRecord = recordContext?.records.find(r => r.id?.toString() === record.extra?.find(e => e.type === 'Reference record Ids')?.value);
+              if (refRecord) {
+                recordContext?.setCurrentRecord(refRecord);
+                recordContext?.setRecordEditMode(true);
+              }
+            }}>
+              {recordContext?.records.find(r => r.id?.toString() === record.extra?.find(e => e.type === 'Reference record Ids')?.value)?.title || 
+               `Record #${record.extra?.find(e => e.type === 'Reference record Ids')?.value}`}
+            </Button>
+          </div>
+        )}
         <Tabs defaultValue="text" className="w-full text-sm">
           {(record.json || record.extra || record.transcription) ? (
             <TabsList className="grid grid-cols-2 gap-2">
@@ -321,6 +335,30 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
           </Button>
           <Button size="icon" variant="ghost" title="Download record as HTML" onClick={() => downloadAsHtml(record.text || record.description, `record-${record.id}`)}>
             <DownloadIcon className="w-4 h-4" />
+          </Button>
+          <Button size="icon" variant="ghost" title="Translate to English" onClick={() => {
+            chatContext?.setChatOpen(true);
+            chatContext?.sendMessage({
+              message: {
+                role: 'user',
+                createdAt: new Date(),
+                content: prompts.translateRecord({ record, language: 'English' }),
+              }, 
+              onResult: async (result) => {
+                if(result) {
+                  try {
+                    recordContext?.setOperationStatus(DataLoadingStatus.Loading);
+                    await recordContext?.updateRecordFromText(result.content, null, true, [
+                      { type: 'Reference record Ids', value: record.id?.toString() || '' }
+                    ]); // add as new record the translation with reference
+                  } finally {
+                    recordContext?.setOperationStatus(DataLoadingStatus.Success);
+                  }
+                }
+              }
+            });
+          }}>
+            <Languages className="w-4 h-4" />
           </Button>
           <AlertDialog>
             <AlertDialogTrigger>

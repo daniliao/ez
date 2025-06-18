@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState, ReactNode } from "react";
-import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText } from "lucide-react";
+import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2 } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import Markdown from "react-markdown";
@@ -76,6 +76,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('text');
   const [textAccordionValue, setTextAccordionValue] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const [displayableAttachments, setDisplayableAttachments] = useState<DisplayableDataObject[]>([]);
 
@@ -185,6 +186,53 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
     
     // Keep the text as is - it's already in the correct markdown format
     return text;
+  };
+
+  // Add effect to log state changes
+  useEffect(() => {
+    console.log('Translation state changed:', isTranslating);
+  }, [isTranslating]);
+
+  const handleTranslation = async () => {
+    if (record.parseInProgress) {
+      toast.info('Please wait until record is successfully parsed');
+      return;
+    }
+    
+    console.log('Starting translation...');
+    setIsTranslating(true);
+    
+    try {
+      if (record.json) {
+        console.log('Record already parsed, translating directly');
+        const translatedRecord = await recordContext?.translateRecord(record);
+        console.log('Translation completed:', translatedRecord);
+      } else {
+        console.log('Record not parsed, parsing first then translating');
+        await new Promise<void>((resolve, reject) => {
+          try {
+            recordContext?.parseRecord(record, async (parsedRecord) => {
+              try {
+                console.log('Parse completed, starting translation');
+                const translatedRecord = await recordContext?.translateRecord(parsedRecord);
+                console.log('Translation completed:', translatedRecord);
+                resolve();
+              } catch (error) {
+                reject(error);
+              }
+            });
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Translation failed:', error);
+      toast.error('Translation failed: ' + error);
+    } finally {
+      console.log('Translation process complete, resetting state');
+      setIsTranslating(false);
+    }
   };
 
   return (
@@ -462,23 +510,18 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
           }}>
             <FileText className="w-4 h-4" />
           </Button>
-          <Button size="icon" variant="ghost" title="Translate to English" onClick={async () => {
-            if (record.parseInProgress) {
-              toast.info('Please wait until record is successfully parsed');
-              return;
-            }
-            if (record.json) {
-              console.log('Record already parsed, translating directly');
-              await recordContext?.translateRecord(record);
-            } else {
-              console.log('Record not parsed, parsing first then translating');
-              recordContext?.parseRecord(record, async (parsedRecord) => {
-                console.log('Parse completed, starting translation');
-                await recordContext?.translateRecord(parsedRecord);
-              });
-            }
-          }}>
-            <Languages className="w-4 h-4" />
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            title="Translate to English" 
+            disabled={isTranslating} 
+            onClick={handleTranslation}
+          >
+            {isTranslating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Languages className="w-4 h-4" />
+            )}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger>

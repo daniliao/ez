@@ -94,7 +94,7 @@ export type RecordContextType = {
     exportRecords: () => void;
     importRecords: (zipFileInput: ArrayBuffer) => void;
     setRecordExtra: (record: Record, type: string, value: string) => Promise<void>;
-    translateRecord: (record: Record, language?: string) => Promise<void>;
+    translateRecord: (record: Record, language?: string) => Promise<Record>;
 }
 
 export const RecordContext = createContext<RecordContextType | null>(null);
@@ -836,37 +836,47 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
     const translateRecord = async (record: Record, language: string = 'English') => {
       try {
-        chatContext?.sendMessage({
-          message: {
-            role: 'user',
-            createdAt: new Date(),
-            content: prompts.translateRecord({ record, language }),
-          }, 
-          onResult: async (result) => {
-            if(result) {
-              try {
-                setOperationStatus(DataLoadingStatus.Loading);
-                // Create a copy of the original record's attachments
-                const attachmentsCopy = record.attachments.map(att => att.toDTO());
-                
-                const translatedRecord = await updateRecordFromText(result.content, null, true, [
-                  { type: 'Reference record Ids', value: record.id?.toString() || '' }
-                ]); 
+        return new Promise<Record>((resolve, reject) => {
+          chatContext?.sendMessage({
+            message: {
+              role: 'user',
+              createdAt: new Date(),
+              content: prompts.translateRecord({ record, language }),
+            }, 
+            onResult: async (result) => {
+              if(result) {
+                try {
+                  setOperationStatus(DataLoadingStatus.Loading);
+                  // Create a copy of the original record's attachments
+                  const attachmentsCopy = record.attachments.map(att => att.toDTO());
+                  
+                  const translatedRecord = await updateRecordFromText(result.content, null, true, [
+                    { type: 'Reference record Ids', value: record.id?.toString() || '' }
+                  ]); 
 
-                if (translatedRecord) {
-                  // Update the translated record with the original attachments
-                  translatedRecord.attachments = attachmentsCopy.map(dto => new EncryptedAttachment(dto));
-                  await updateRecord(translatedRecord);
+                  if (translatedRecord) {
+                    // Update the translated record with the original attachments
+                    translatedRecord.attachments = attachmentsCopy.map(dto => new EncryptedAttachment(dto));
+                    const updatedRecord = await updateRecord(translatedRecord);
+                    resolve(updatedRecord);
+                  } else {
+                    reject(new Error('Failed to create translated record'));
+                  }
+                } catch (error) {
+                  reject(error);
+                } finally {
+                  setOperationStatus(DataLoadingStatus.Success);
                 }
-              } finally {
-                setOperationStatus(DataLoadingStatus.Success);
+              } else {
+                reject(new Error('No translation result received'));
               }
             }
-          }
+          });
         });
       } catch (error) {
         console.error('Error translating record:', error);
         toast.error('Error translating record: ' + error);
+        throw error;
       }
     }
 

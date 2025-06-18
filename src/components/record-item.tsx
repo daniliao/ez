@@ -141,8 +141,22 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
         if (autoTranslate) {  // Check for exact string 'true'
           console.log('Auto-translate enabled, setting up callback');
           recordContext?.parseRecord(record, async (parsedRecord) => {
-            console.log('Parse completed, starting translation');
-            await recordContext?.translateRecord(parsedRecord);
+            // Wait for chatContext.isStreaming to be false, but max 10s
+            const start = Date.now();
+            const waitForStreaming = async () => {
+              while (chatContext.isStreaming) {
+                if (Date.now() - start > 10000) {
+                  console.warn('Translation skipped: chatContext.isStreaming still true after 10s');
+                  return false;
+                }
+                await new Promise(res => setTimeout(res, 200));
+              }
+              return true;
+            };
+            const canTranslate = await waitForStreaming();
+            if (canTranslate) {
+              await recordContext?.translateRecord(parsedRecord);
+            }
           });
         } else {
           console.log('Auto-translate disabled');

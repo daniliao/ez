@@ -144,12 +144,27 @@ export function findCodeBlocks(block: string, singleBlockMode = true) {
 }
 
 export function convertRecordIdsToLinks(text: string): string {
+  if (!text) return '';
+  
   // Match patterns like "Record Id: 1, 2, 5" or "RecordIds: 1,2,5" (case insensitive)
   const recordIdPattern = /Record\s*Id(?:s)?:?\s*([\d,\s]+)/gi;
   
-  return text.replace(recordIdPattern, (match, ids) => {
+  // First replace record IDs
+  let result = text.replace(recordIdPattern, (match, ids) => {
     // Clean up the IDs by removing extra spaces
     const cleanIds = ids.replace(/\s+/g, '');
     return `[${match}](#records-${cleanIds})`;
   });
+
+  // Match patterns like "Page 4" or "page 4" or "p. 4" or "p.4"
+  const pagePattern = /(?:page|p\.?)\s*(\d+)/gi;
+  
+  // Then replace page references
+  result = result.replace(pagePattern, (match, pageNum) => {
+    // Convert to zero-based index for image array
+    const imageIndex = parseInt(pageNum) - 1;
+    return `[${match}](#image-${imageIndex})`;
+  });
+
+  return result;
 }

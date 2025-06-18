@@ -157,6 +157,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                     width={100}
                     height={100}
                     key={`attachment-prv-${index}`}
+                    id={`image-${index}`}
                     src={attachment.url}
                     alt={attachment.name}
                   />
@@ -229,7 +230,34 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
             <TabsContent value="text" className="max-w-600">
               {record.description ? (
                 <div className="mt-5 rose text-sm text-muted-foreground">
-                  <Markdown className={styles.markdown} remarkPlugins={[remarkGfm]}>{convertRecordIdsToLinks(record.description)}</Markdown>
+                  <Markdown 
+                    className={styles.markdown} 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: ({node, href, ...props}: {node?: any, href?: string, [key: string]: any}) => {
+                        if (href?.startsWith('#image-')) {
+                          return (
+                            <a
+                              href={href}
+                              {...props}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const imageId = href.substring(1);
+                                const imageElement = document.getElementById(imageId);
+                                if (imageElement) {
+                                  imageElement.click();
+                                }
+                              }}
+                              className="cursor-pointer text-blue-500 hover:text-blue-700"
+                            />
+                          );
+                        }
+                        return <a href={href} {...props} />;
+                      }
+                    }}
+                  >
+                    {convertRecordIdsToLinks(record.description)}
+                  </Markdown>
                   {record.text && (
                     <div className="mt-2">
                       <Button 
@@ -277,6 +305,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                           width={100}
                           height={100}
                           key={`attachment-prv-${index}`}
+                          id={`image-${index}`}
                           src={attachment.url}
                           alt={attachment.name}
                         />

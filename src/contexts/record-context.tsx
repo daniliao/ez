@@ -592,6 +592,37 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               } else if (ocrProvider === 'gemini') {
                 await geminiParseRecord(record, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
               }
+
+              // Check if auto-translation is enabled
+              const autoTranslate = await config?.getServerConfig('autoTranslateRecord');
+              if (autoTranslate) {
+                try {
+                  // Send translation request to chat
+                  chatContext?.sendMessage({
+                    message: {
+                      role: 'user',
+                      createdAt: new Date(),
+                      content: prompts.translateRecord({ record, language: 'English' }),
+                    }, 
+                    onResult: async (result) => {
+                      if(result) {
+                        try {
+                          setOperationStatus(DataLoadingStatus.Loading);
+                          await updateRecordFromText(result.content, null, true, [
+                            { type: 'Reference record Ids', value: record.id?.toString() || '' }
+                          ]); // add as new record the translation with reference
+                        } finally {
+                          setOperationStatus(DataLoadingStatus.Success);
+                        }
+                      }
+                    }
+                  });
+                } catch (error) {
+                  console.error('Error auto-translating record:', error);
+                  toast.error('Error auto-translating record: ' + error);
+                }
+              }
+
               console.log('Record parsed, taking next record', record);
               parseQueue = parseQueue.slice(1); // remove one item
               parseQueueLength = parseQueue.length;

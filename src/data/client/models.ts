@@ -156,7 +156,7 @@ export const recordItemSchema = z.object({
   
 export type RecordItem = z.infer<typeof recordItemSchema>;
 
-export type PostParseCallback = (record: Record) => void;
+export type PostParseCallback = (record: Record) => Promise<void>;
 
 export class Record {
     id?: number;

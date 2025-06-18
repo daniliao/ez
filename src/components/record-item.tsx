@@ -142,7 +142,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
           console.log('Auto-translate enabled, setting up callback');
           recordContext?.parseRecord(record, async (parsedRecord) => {
             console.log('Parse completed, starting translation');
-            recordContext?.translateRecord(parsedRecord);
+            await recordContext?.translateRecord(parsedRecord);
           });
         } else {
           console.log('Auto-translate disabled');

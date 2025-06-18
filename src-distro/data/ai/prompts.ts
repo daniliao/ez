@@ -14,6 +14,15 @@ export type TranslationBenchmarkContext = {
     humanTranslationRecord: Record;
     aiTranslationRecord: Record;
 }
+
+function recordDescriptionPrompt(context: PromptContext) {
+    return `<description-field>Please fill the "description" field of the record based on these rules:
+        1. Create a table with the following columns: page number, summary, types of data, importance
+        2. From the record text put into table actual page numbers, one sentece summary of the page content, types of medical record included on this page, overal importance (1-10 (higher is more important)) for the medical case descibed in the document
+        3. Put the page numbers in table in this format: Page X
+    </description-field>`;
+}
+
 export const prompts = {
     
     translationBenchmark: ({ originalRecord, humanTranslationRecord, aiTranslationRecord }: TranslationBenchmarkContext) => {
@@ -51,6 +60,7 @@ export const prompts = {
                 First: JSON should be all in original language. \
                 Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
                 Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
+                ' + recordDescriptionPrompt(context) + '\
                 Do not put into summary and title any terms or words that are not in the text.  Add page number of the terms occurences to the terms used in the title and summary in () brackets.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
@@ -65,6 +75,7 @@ export const prompts = {
                 First: JSON should be all in original language. \
                 Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
                 Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
+                ' + recordDescriptionPrompt(context) + '\
                 Do not put into summary and title any terms or words that are not in the text.  Add page number of the terms occurences to the terms used in the title and summary in () brackets.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
@@ -80,6 +91,7 @@ export const prompts = {
                 Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
                 Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
                 If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. \
+                ' + recordDescriptionPrompt(context) + '\
                 Do not put into summary and title any terms or words that are not in the text.  Add page number of the terms occurences to the terms used in the title and summary in () brackets.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
@@ -91,7 +103,7 @@ export const prompts = {
 
     generateRecordMetaData: (context: PromptContext, text: string) => {
         return 'Generate meta data for the record: ' + text + '. Do not use the domain specific terms and words that are not in the text in the summary - do not add your custom interpretations over medical terms. Return JSON with written in original language in the following schema: \
-                ' + JSON.stringify(itemSchema) + '```\r\n\r\n'        
+                ' + JSON.stringify(itemSchema) + '```\r\n\r\n' + recordDescriptionPrompt(context)
     },
 
     recordRemovePII: (context: PromptContext, ocrText: string) => {

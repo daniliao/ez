@@ -54,8 +54,10 @@ export function Chat() {
   const config = useContext(ConfigContext);
   const chatContext = useContext(ChatContext);
   const [currentMessage, setCurrentMessage] = useState('');
-  const [llmProvider, setLlmProvider] = useState('');
+  const [llmProvider, setLlmProvider] = useState(chatContext.providerName);
   const [llmModel, setLlmModel] = useState('');
+  const [llmModelForParse, setLlmModelForParse] = useState('');
+  const [llmProviderForParse, setLlmProviderForParse] = useState('');
   const messageTextArea = useRef<HTMLTextAreaElement | null>(null);
   const lastMessageRef = useRef<HTMLDivElement | null>(null);
   const [addFolderContext, setFolderContext] = useState(true);
@@ -79,6 +81,8 @@ export function Chat() {
     }
     async function loadConfig() {
       setDefaultChatProvider(await config?.getServerConfig('llmProviderChat') as string);
+      setLlmModelForParse(await config?.getServerConfig('llmModelParse') as string ?? '');
+      setLlmProviderForParse(await config?.getServerConfig('llmProviderParse') as string ?? '');
       if(!llmProvider) {
           setLlmProvider(await config?.getServerConfig('llmProviderChat') as string);
       }
@@ -326,7 +330,7 @@ export function Chat() {
             ):null}
 
             {chatContext.isStreaming ? (
-              <div className="flex"><div className="ml-2 h-4 w-4 animate-spin rounded-full border-4 border-primary border-t-transparent" /> <span className="text-xs">AI request in progress, provider: {llmProvider ? llmProvider : chatContext?.providerName}{llmModel ? ' (' + llmModel + ')' : ''}</span></div>
+              <div className="flex"><div className="ml-2 h-4 w-4 animate-spin rounded-full border-4 border-primary border-t-transparent" /> <span className="text-xs">AI {((recordContext?.parseQueueLength ??  0) > 0) ? 'parse' : 'request'} in progress, provider: {((recordContext?.parseQueueLength ??  0) > 0) ? llmProviderForParse : (llmProvider ? llmProvider : chatContext?.providerName)}{llmModel && !recordContext?.parseQueueLength ? ' (' + llmModel + ')' : ((recordContext?.parseQueueLength ??  0) > 0 ? ' (' + llmModelForParse + ')' : '' )}</span></div>
             ):null}
             <div id="last-message" ref={lastMessageRef}></div>
           {/* <div className="flex items-start gap-4 justify-end">

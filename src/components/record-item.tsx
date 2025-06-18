@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState, ReactNode } from "react";
-import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2 } from "lucide-react";
+import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2, LanguagesIcon } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import Markdown from "react-markdown";
@@ -302,7 +302,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
         </div>
         {record.extra?.find(e => e.type === 'Reference record Ids')?.value && (
           <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-            Translated from: {(() => {
+            <div className="flex items-center"><LanguagesIcon className="w-4 h-4 mr-2" /> Translated from: {(() => {
               const refId = record.extra?.find(e => e.type === 'Reference record Ids')?.value;
               const refRecord = recordContext?.records.find(r => r.id?.toString() === refId);
               return (
@@ -316,7 +316,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                   {refRecord?.title || `Record #${refId}`}
                 </a>
               );
-            })()}
+            })()}</div>
           </div>
         )}
         <div className="hidden">

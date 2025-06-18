@@ -176,6 +176,17 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             setOperationStatus(DataLoadingStatus.Loading);
             const client = await setupApiClient(config);
 
+            // Check for language in extra field and add corresponding tag
+            const languageExtra = record.extra?.find(e => e.type === 'Translation language')?.value;
+            if (languageExtra && typeof languageExtra === 'string') {
+                const languageTag = `Language: ${languageExtra}`;
+                if (!record.tags) {
+                    record.tags = [languageTag];
+                } else if (!record.tags.includes(languageTag)) {
+                    record.tags.push(languageTag);
+                }
+            }
+
             if (record.json && record.json.length > 0) {
               if (record.json[0].title && !record.title) {
                 record.title = record.json[0].title;

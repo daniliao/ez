@@ -362,13 +362,23 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     const deleteRecord = async (record: Record) => {
         const prClient = await setupApiClient(config);
         const attClient = await setupAttachmentsApiClient(config);
+
+        // Check for preserved attachments
+        const preservedAttachmentsExtra = record.extra?.find(e => e.type === 'Preserved attachments')?.value;
+        const preservedAttachmentIds = typeof preservedAttachmentsExtra === 'string' ? preservedAttachmentsExtra.split(',').map(id => id.trim()) : [];
+        
         if(record.attachments.length > 0) {
-          record.attachments.forEach(async (attachment) => {
+          for(const attachment of record.attachments) {
+            // Skip deletion if attachment is preserved
+            if (preservedAttachmentIds.includes(attachment.id?.toString() || '')) {
+              console.log('Skipping deletion of preserved attachment:', attachment.id);
+              continue;
+            }
             const result = await attClient.delete(attachment.toDTO());
             if (result.status !== 200) {
                 toast.error('Error removing attachment: ' + attachment.displayName)
             }
-          })
+          }
         }
         const result = await prClient.delete(record)
         if(result.status !== 200) {

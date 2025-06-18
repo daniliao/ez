@@ -16,11 +16,11 @@ export type TranslationBenchmarkContext = {
 }
 
 function recordDescriptionPrompt(context: PromptContext) {
-    return `<description-field>Please fill the "description" field of the record based on these rules:
+    return `<summary-field>Please fill the "summary" field of the record based on these rules:
         1. Create a table with the following columns: page number, summary, types of data, importance
         2. From the record text put into table actual page numbers, one sentece summary of the page content, types of medical record included on this page, overal importance (1-10 (higher is more important)) for the medical case descibed in the document
         3. Put the page numbers in table in this format: Page X
-    </description-field>`;
+    </summary-field>`;
 }
 
 export const prompts = {
@@ -43,63 +43,110 @@ export const prompts = {
     },
 
     recordParseMultimodal: (context: PromptContext) => {
-        return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, please parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others. \
+        return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, please parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
                 First: JSON should be all in original language. \
-                Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
-                Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
-                Summary the record to one nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
+                Each medical record should be a row of returned JSON array of objects in format given below. \
+                First element of an array should be for metadata of all pages processed - and an overall summary of all items. \
+                <first_item> \
+                For this first summary item: \
+                - Summary the overal record - all the items - with a nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 ' + recordDescriptionPrompt(context) + '\
-                Do not put into summary and title any terms or words that are not in the text. Add page number of the terms occurences to the terms used in the title and summary in () brackets. \
+                - Do not put into summary and title any terms or words that are not in the text. Add page number of the terms occurences to the terms used in the title and summary in () brackets. \
+                - Set the "type" to "metadata" and "subtype" to "summary". \
+                - Set the the other fields accordingly to the other items. \
+                </first_item> \
+                <next_items> \
+                For next items: \
+                If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data! \
+                Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
-                extract very detailed and all features from it and put it as an array under "findings" key. Second: Markdown text - please do kind of OCR - so convert all the \
+                extract very detailed and all features from it and put it as an array under "findings" key. \
+                </next_items> \
+                Second: Markdown text - please do kind of OCR - so convert all the \
                 attachments to text. One attachment is a one page of the record. Include page numbers in markdown. If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. Please use markdown to format it nicely and return after JSON object, \
-                wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n: \r\n\r\n```json\r\n \
-                ' + JSON.stringify(itemSchema) + '```\r\n\r\n'
+                wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n <item_schema>\r\n\r\n```json\r\n \
+                ' + JSON.stringify(itemSchema) + '```\r\n\r\n</item_schema>\r\n\r\n' 
     }, // [ { type: "blood_results", subtype: "morphology", findings: [], ... }, {type: "mri", subtype: "head mri", ...}]
     recordParseOCR: (context: PromptContext, ocrText: string) => {
-        return 'Below is my health result data in plain text. Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others. \
+        return 'Below is my health result data in plain text. Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
                 First: JSON should be all in original language. \
-                Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
-                Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
+                First element of an array should be for metadata of all pages processed - and an overall summary of all items. \
+                <first_item> \
+                For this first summary item: \
+                - Summary the overal record - all the items - with a nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 ' + recordDescriptionPrompt(context) + '\
+                - Do not put into summary and title any terms or words that are not in the text. Add page number of the terms occurences to the terms used in the title and summary in () brackets. \
+                - Set the "type" to "metadata" and "subtype" to "summary". \
+                - Set the the other fields accordingly to the other items. \
+                </first_item> \
+                <next_items> \
+                For next items: \
+                Each medical record should be a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
+                Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
                 Do not put into summary and title any terms or words that are not in the text.  Add page number of the terms occurences to the terms used in the title and summary in () brackets.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
-                extract very detailed and all features from it and put it as an array under "findings" key. \n\r\n\rSecond: Fix all the original text issues and glitches. Please use markdown to format the nicely and return after JSON object, \
-                wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n: \r\n\r\n```json\r\n' +
-                JSON.stringify(itemSchema) + '```\r\n\r\n Original text: ' + ocrText;
+                extract very detailed and all features from it and put it as an array under "findings" key. \
+                </next_items> \
+                \n\r\n\rSecond: Fix all the original text issues and glitches. Please use markdown to format the nicely and return after JSON object, \
+                wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n <item_schema>\r\n\r\n```json\r\n' +
+                JSON.stringify(itemSchema) + '```\r\n\r\n</item_schema>\r\n\r\n Original text: ' + ocrText;
     }, // [ { type: "blood_results", subtype: "morphology", findings: [], ... }, {type: "mri", subtype: "head mri", ...}]
 
     recordParseMultimodalTranscription: (context: PromptContext) => {
-        return 'This is my health result data AND audio transcription. Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, fix errors in transcription. Please parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others. \
+        return 'This is my health result data AND audio transcription. Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, fix errors in transcription. Please parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
                 Audio transcription: ' + context.record?.transcription + '\r\n\
                 First: JSON should be all in original language. \
-                Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
-                Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
+                First element of an array should be for metadata of all pages processed - and an overall summary of all items. \
+                <first_item> \
+                For this first summary item: \
+                - Summary the overal record - all the items - with a nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 ' + recordDescriptionPrompt(context) + '\
+                - Do not put into summary and title any terms or words that are not in the text. Add page number of the terms occurences to the terms used in the title and summary in () brackets. \
+                - Set the "type" to "metadata" and "subtype" to "summary". \
+                - Set the the other fields accordingly to the other items. \
+                </first_item> \
+                <next_items> \
+                For next items: \
+                Each medical record should be a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
+                Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
                 Do not put into summary and title any terms or words that are not in the text.  Add page number of the terms occurences to the terms used in the title and summary in () brackets.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
-                extract very detailed and all features from it and put it as an array under "findings" key. Second: Markdown text - please do kind of OCR - so convert all the \
+                extract very detailed and all features from it and put it as an array under "findings" key. \
+                </next_items> \
+                Second: Markdown text - please do kind of OCR - so convert all the \
                 attachments to text. One attachment is a one page of the record. Include page numbers in markdown. If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. Please use markdown to format it nicely and return after JSON object, \
-                wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n: \r\n\r\n```json\r\n \
-                ' + JSON.stringify(itemSchema) + '```\r\n\r\n'
+                wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n <item_schema>\r\n\r\n```json\r\n \
+                ' + JSON.stringify(itemSchema) + '```\r\n\r\n</item_schema>\r\n\r\n'
     }, // [ { type: "blood_results", subtype: "morphology", findings: [], ... }, {type: "mri", subtype: "head mri", ...}]
     recordParseOCRTranscription: (context: PromptContext, ocrText: string) => {
-        return 'Below is my health result data in plain text AND audio transcription. Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, fix errors in transcription. Parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others. \
+        return 'Below is my health result data in plain text AND audio transcription. Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, fix errors in transcription. Parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
                 Audio transcription: ' + context.record?.transcription + '\r\n\
                 First: JSON should be all in original language. \
-                Each medical record should a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
+                First element of an array should be for metadata of all pages processed - and an overall summary of all items. \
+                <first_item> \
+                For this first summary item: \
+                - Summary the overal record - all the items - with a nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
+                ' + recordDescriptionPrompt(context) + '\
+                - Do not put into summary and title any terms or words that are not in the text. Add page number of the terms occurences to the terms used in the title and summary in () brackets. \
+                - Set the "type" to "metadata" and "subtype" to "summary". \
+                - Set the the other fields accordingly to the other items. \
+                </first_item> \
+                <next_items> \
+                For next items: \
+                Each medical record should be a row of returned JSON array of objects in format given below. If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data!\
                 Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
                 One attachment is a one page of the record. Include page numbers in markdown. \
                 If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. \
-                ' + recordDescriptionPrompt(context) + '\
                 Do not put into summary and title any terms or words that are not in the text.  Add page number of the terms occurences to the terms used in the title and summary in () brackets.  \
                 Summary the record to one nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
                 Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
-                extract very detailed and all features from it and put it as an array under "findings" key. \n\r\n\rSecond: Fix all the original text issues and glitches. Please use markdown to format the nicely and return after JSON object, \
-                wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n: \r\n\r\n```json\r\n' +
-                JSON.stringify(itemSchema) + '```\r\n\r\n Original text: ' + ocrText;
+                extract very detailed and all features from it and put it as an array under "findings" key. \
+                </next_items> \
+                \n\r\n\rSecond: Fix all the original text issues and glitches. Please use markdown to format the nicely and return after JSON object, \
+                wrap it with  ```markdown on start and  ``` on end of the text. Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n <item_schema>\r\n\r\n```json\r\n' +
+                JSON.stringify(itemSchema) + '```\r\n\r\n</item_schema>\r\n\r\n Original text: ' + ocrText;
     }, // [ { type: "blood_results", subtype: "morphology", findings: [], ... }, {type: "mri", subtype: "head mri", ...}]
 
 

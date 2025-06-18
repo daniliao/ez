@@ -27,6 +27,7 @@ export const ENV_PROVIDED_CONFIG: Record<string, any> = {
   geminiApiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
   displayAttachmentPreviews: process.env.NEXT_PUBLIC_DISPLAY_ATTACHMENT_PREVIEWS,
   ocrProvider: process.env.NEXT_PUBLIC_OCR_PROVIDER,
+  autoTranslateRecord: process.env.NEXT_PUBLIC_AUTO_TRANSLATE_RECORD,
   ocrLanguage: process.env.NEXT_PUBLIC_OCR_LANGUAGE,
   ollamaUrl: process.env.NEXT_PUBLIC_OLLAMA_URL,
   ollamaModel: process.env.NEXT_PUBLIC_OLLAMA_MODEL,

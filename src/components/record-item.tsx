@@ -302,7 +302,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
         </div>
         {record.extra?.find(e => e.type === 'Reference record Ids')?.value && (
           <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-            <div className="flex items-center"><LanguagesIcon className="w-4 h-4 mr-2" /> Translated from: {(() => {
+            <div className="flex items-center"><span className="p-2 flex"><LanguagesIcon className="w-4 h-4 mr-2" /> Translations:</span> {(() => {
               const refId = record.extra?.find(e => e.type === 'Reference record Ids')?.value;
               const refRecord = recordContext?.records.find(r => r.id?.toString() === refId);
               return (

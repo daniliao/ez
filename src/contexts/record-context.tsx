@@ -883,8 +883,25 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                     // Update the translated record with the original attachments and eventDate
                     translatedRecord.attachments = attachmentsCopy.map(dto => new EncryptedAttachment(dto));
                     translatedRecord.eventDate = record.eventDate || record.createdAt;
-                    const updatedRecord = await updateRecord(translatedRecord);
-                    resolve(updatedRecord);
+                    const updatedTranslatedRecord = await updateRecord(translatedRecord);
+
+                    // Create a bi-directional reference by updating the original record
+                    const translationRefsKey = 'Reference record Ids';
+                    const existingTranslationRefs = record.extra?.find(e => e.type === translationRefsKey);
+                    
+                    if (existingTranslationRefs && typeof existingTranslationRefs.value === 'string') {
+                      // If there are existing translations, append the new one
+                      const existingIds = existingTranslationRefs.value.split(',').map(id => id.trim());
+                      if (!existingIds.includes(updatedTranslatedRecord.id?.toString() || '')) {
+                        existingTranslationRefs.value = [...existingIds, updatedTranslatedRecord.id?.toString()].join(', ');
+                        await setRecordExtra(record, translationRefsKey, existingTranslationRefs.value);
+                      }
+                    } else {
+                      // If this is the first translation, create new reference
+                      await setRecordExtra(record, translationRefsKey, updatedTranslatedRecord.id?.toString() || '');
+                    }
+
+                    resolve(updatedTranslatedRecord);
                   } else {
                     reject(new Error('Failed to create translated record'));
                   }

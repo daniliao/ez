@@ -176,17 +176,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             setOperationStatus(DataLoadingStatus.Loading);
             const client = await setupApiClient(config);
 
-            // Check for language in extra field and add corresponding tag
-            const languageExtra = record.extra?.find(e => e.type === 'Translation language')?.value;
-            if (languageExtra && typeof languageExtra === 'string') {
-                const languageTag = `Language: ${languageExtra}`;
-                if (!record.tags) {
-                    record.tags = [languageTag];
-                } else if (!record.tags.includes(languageTag)) {
-                    record.tags.push(languageTag);
-                }
-            }
-
             if (record.json && record.json.length > 0) {
               if (record.json[0].title && !record.title) {
                 record.title = record.json[0].title;
@@ -204,6 +193,18 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 }, []);
                 record.tags = uniqueTags;
               }
+
+            // Check for language in extra field and add corresponding tag
+            const languageExtra = record.extra?.find(e => e.type === 'Translation language')?.value;
+            if (languageExtra && typeof languageExtra === 'string') {
+                const languageTag = `Language: ${languageExtra}`;
+                if (!record.tags) {
+                    record.tags = [languageTag];
+                } else if (!record.tags.includes(languageTag)) {
+                    record.tags.push(languageTag);
+                }
+              }
+
             }
             if (!record.eventDate) {
               record.eventDate = record.createdAt; // backward compatibility for #150
@@ -874,8 +875,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                   const translatedRecord = await updateRecordFromText(result.content, null, true, [
                     { type: 'Reference record Ids', value: record.id?.toString() || '' },
                     { type: 'Translation language', value: language },
-                    { type: 'Preserved attachments', value: attachmentsCopy.map(att => att.id).join(', ') },
-                    { type: 'Original eventDate', value: record.eventDate || record.createdAt }
+                    { type: 'Preserved attachments', value: attachmentsCopy.map(att => att.id).join(', ') }
                   ]); 
 
                   if (translatedRecord) {

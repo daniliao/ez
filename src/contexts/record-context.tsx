@@ -618,7 +618,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
               // Execute post-parse callback if exists
               if (updatedRecord && currentRecord.postParseCallback) {
-                await currentRecord.postParseCallback(updatedRecord);
+                currentRecord.postParseCallback(updatedRecord);
               }
             } catch (error) {
               console.error('Error processing record:', error);

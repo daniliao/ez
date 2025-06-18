@@ -66,7 +66,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const recordContext = useContext(RecordContext)
   const chatContext = useContext(ChatContext);
   const dbContext = useContext(DatabaseContext);
-  const config = useContext(ConfigContext);
+  const configContext = useContext(ConfigContext);
   const folderContext = useContext(FolderContext)
   const [displayableAttachmentsInProgress, setDisplayableAttachmentsInProgress] = useState(false)
   const [commandsOpen, setCommandsOpen] = useState(false);
@@ -133,9 +133,21 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
     }
 
     async function parseRecord() {
-      if (await config?.getServerConfig('autoParseRecord') && (record.checksum !== record.checksumLastParsed) && !record.parseInProgress && !record.parseError && (new Date().getTime() - new Date(record.updatedAt).getTime()) < 1000 * 60 * 60 /* parse only records changed up to 1 h */) { // TODO: maybe we need to add "parsedDate" or kind of checksum (better!) to make sure the record is parseed only when something changed
+      if (await configContext?.getServerConfig('autoParseRecord') && (record.checksum !== record.checksumLastParsed) && !record.parseInProgress && !record.parseError && (new Date().getTime() - new Date(record.updatedAt).getTime()) < 1000 * 60 * 60 /* parse only records changed up to 1 h */) { // TODO: maybe we need to add "parsedDate" or kind of checksum (better!) to make sure the record is parseed only when something changed
         console.log('Adding to parse queue due to checksum mismatch ', record.id, record.checksum, record.checksumLastParsed);
-        recordContext?.parseRecord(record);
+        const autoTranslate = await configContext?.getServerConfig('autoTranslateRecord');
+        if (autoTranslate) {  // Check for exact string 'true'
+          console.log('Auto-translate enabled, setting up callback');
+          recordContext?.parseRecord(record, async (parsedRecord) => {
+            console.log('Parse completed, starting translation');
+            await recordContext?.translateRecord(parsedRecord);
+          });
+        } else {
+          console.log('Auto-translate disabled');
+          recordContext?.parseRecord(record);
+        }
+
+
       }
       recordContext?.processParseQueue();
     }
@@ -447,14 +459,6 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
               toast.info('Record parsing already in progress');
               return;
             }
-            const autoTranslate = await config?.getServerConfig('autoTranslateRecord');
-            if (autoTranslate) {
-              recordContext?.parseRecord(record, async (parsedRecord) => {
-                await recordContext?.translateRecord(parsedRecord);
-              });
-            } else {
-              recordContext?.parseRecord(record);
-            }
           }}>
             <FileText className="w-4 h-4" />
           </Button>
@@ -464,9 +468,12 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
               return;
             }
             if (record.json) {
-              recordContext?.translateRecord(record);
+              console.log('Record already parsed, translating directly');
+              await recordContext?.translateRecord(record);
             } else {
+              console.log('Record not parsed, parsing first then translating');
               recordContext?.parseRecord(record, async (parsedRecord) => {
+                console.log('Parse completed, starting translation');
                 await recordContext?.translateRecord(parsedRecord);
               });
             }

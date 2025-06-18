@@ -846,9 +846,18 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             if(result) {
               try {
                 setOperationStatus(DataLoadingStatus.Loading);
-                await updateRecordFromText(result.content, null, true, [
+                // Create a copy of the original record's attachments
+                const attachmentsCopy = record.attachments.map(att => att.toDTO());
+                
+                const translatedRecord = await updateRecordFromText(result.content, null, true, [
                   { type: 'Reference record Ids', value: record.id?.toString() || '' }
-                ]); // add as new record the translation with reference
+                ]); 
+
+                if (translatedRecord) {
+                  // Update the translated record with the original attachments
+                  translatedRecord.attachments = attachmentsCopy.map(dto => new EncryptedAttachment(dto));
+                  await updateRecord(translatedRecord);
+                }
               } finally {
                 setOperationStatus(DataLoadingStatus.Success);
               }

@@ -1,3 +1,4 @@
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState, ReactNode } from "react";
@@ -302,21 +303,46 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
         </div>
         {record.extra?.find(e => e.type === 'Reference record Ids')?.value && (
           <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-            <div className="flex items-center"><span className="p-2 flex"><LanguagesIcon className="w-4 h-4 mr-2" /> Translations:</span> {(() => {
-              const refId = record.extra?.find(e => e.type === 'Reference record Ids')?.value;
-              const refRecord = recordContext?.records.find(r => r.id?.toString() === refId);
-              return (
-                <a
-                  href={`#records-${refId}`}
-                  className="underline hover:text-blue-500 cursor-pointer"
-                  onClick={e => {
-                    // Let the hash change trigger the popup; no edit mode
-                  }}
-                >
-                  {refRecord?.title || `Record #${refId}`}
-                </a>
-              );
-            })()}</div>
+            <div className="flex items-center">
+              <span className="p-2 flex">
+                <LanguagesIcon className="w-4 h-4 mr-2" /> Translations:
+              </span>
+              {(() => {
+                const refId = record.extra?.find(e => e.type === 'Reference record Ids')?.value;
+                const refIds = typeof refId === 'string' ? refId.split(',').map(id => id.trim()) : [];
+                const refRecords = refIds.map(id => ({
+                  id,
+                  record: recordContext?.records.find(r => r.id?.toString() === id)
+                }));
+                
+                return (
+                  <div className="flex items-center">
+                    {refIds.length > 0 && (
+                      <div className="p-2">
+                        {refIds.length === 1 ? (
+                          <a href={`#records-${refIds[0]}`} className="text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:underline">
+                            {refRecords[0].record?.title || `#${refIds[0]}`}
+                          </a>
+                        ) : (
+                          <>
+                            <div className="text-zinc-500 dark:text-zinc-400">
+                              {refRecords.map(({ id, record: refRecord }, index: number) => (
+                                <React.Fragment key={id}>
+                                  <a href={`#records-${id}`} className="text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:underline">
+                                    {refRecord?.title || `#${id}`}
+                                  </a>
+                                  {index < refIds.length - 1 && ', '}
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full text-sm">

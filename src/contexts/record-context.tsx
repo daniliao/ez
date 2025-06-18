@@ -874,12 +874,14 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                   const translatedRecord = await updateRecordFromText(result.content, null, true, [
                     { type: 'Reference record Ids', value: record.id?.toString() || '' },
                     { type: 'Translation language', value: language },
-                    { type: 'Preserved attachments', value: attachmentsCopy.map(att => att.id).join(', ') }
+                    { type: 'Preserved attachments', value: attachmentsCopy.map(att => att.id).join(', ') },
+                    { type: 'Original eventDate', value: record.eventDate || record.createdAt }
                   ]); 
 
                   if (translatedRecord) {
-                    // Update the translated record with the original attachments
+                    // Update the translated record with the original attachments and eventDate
                     translatedRecord.attachments = attachmentsCopy.map(dto => new EncryptedAttachment(dto));
+                    translatedRecord.eventDate = record.eventDate || record.createdAt;
                     const updatedRecord = await updateRecord(translatedRecord);
                     resolve(updatedRecord);
                   } else {

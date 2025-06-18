@@ -851,7 +851,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                   const attachmentsCopy = record.attachments.map(att => att.toDTO());
                   
                   const translatedRecord = await updateRecordFromText(result.content, null, true, [
-                    { type: 'Reference record Ids', value: record.id?.toString() || '' }
+                    { type: 'Reference record Ids', value: record.id?.toString() || '' },
+                    { type: 'Translation language', value: language },
+                    { type: 'Preserved attachments', value: attachmentsCopy.map(att => att.id).join(', ') }
                   ]); 
 
                   if (translatedRecord) {

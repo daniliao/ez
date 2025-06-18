@@ -136,6 +136,35 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
     document.body.removeChild(htmlElement);
   }
 
+  const handleImageClick = (imageId: string) => {
+    if (typeof window !== 'undefined' && (window as any).zoomableImages && (window as any).zoomableImages[imageId]) {
+      (window as any).zoomableImages[imageId].open();
+    }
+  };
+
+  const handleImageLinkClick = (e: React.MouseEvent, imageId: string) => {
+    e.preventDefault();
+    handleImageClick(imageId);
+  };
+
+  const processText = (text: string | undefined | null, recordId: string | number | undefined) => {
+    if (!recordId || !text) return '';
+    
+    // First handle any existing markdown links
+    let processed = text.replace(/\[Page (\d+)\]\(#image-[\d-]+\)/g, (match, pageNum) => {
+      const imageId = `image-${recordId}-${parseInt(pageNum) - 1}`;
+      return `[Page ${pageNum}](#${imageId})`;
+    });
+
+    // Then handle plain "Page X" text (not already in a link)
+    processed = processed.replace(/Page (\d+)(?!\]|\))/g, (match, pageNum) => {
+      const imageId = `image-${recordId}-${parseInt(pageNum) - 1}`;
+      return `[Page ${pageNum}](#${imageId})`;
+    });
+
+    return processed;
+  };
+
   return (
       record.parseInProgress ? (
         <div className="bg-zinc-100 dark:bg-zinc-800 md:p-4 xs:p-2 md:rounded-md mb-4 xs:mb-2">
@@ -153,13 +182,13 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
               <div className="mt-2 flex-wrap flex items-center justify-left min-h-100 w-full">
                 {displayableAttachments.map((attachment, index) => (
                   <ZoomableImage
-                    className='w-100 pr-2 pb-2'
+                    key={`attachment-${record.id}-${index}`}
+                    src={attachment.url}
+                    alt={`Page ${index + 1}`}
                     width={100}
                     height={100}
-                    key={`attachment-prv-${index}`}
-                    id={`image-${index}`}
-                    src={attachment.url}
-                    alt={attachment.name}
+                    className="w-100 pr-2 pb-2"
+                    id={`image-${record.id}-${index}`}
                   />
                 ))}
               </div>
@@ -191,7 +220,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
       <div className="bg-zinc-100 dark:bg-zinc-800 md:p-4 xs:p-2 md:rounded-md mb-4 xs:mb-2">
         <div className="flex items-center justify-between mb-4">
           {record.title ? (
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{record.title}</div>
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{record.id}: {record.title}</div>
           ) : (
             (record.json) ? (
               <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{record.id}: {labels.recordItemLabel(record.type, { record })}</div>
@@ -234,29 +263,30 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                     className={styles.markdown} 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      a: ({node, href, ...props}: {node?: any, href?: string, [key: string]: any}) => {
-                        if (href?.startsWith('#image-')) {
+                      a: ({node, href, children, ...props}: {node?: any; href?: string; children?: React.ReactNode; [key: string]: any}) => {
+                        if (href?.includes('image-')) {
+                          const imageId = href.startsWith('#') ? href.substring(1) : href;
                           return (
                             <a
-                              href={href}
+                              href="#"
                               {...props}
                               onClick={(e) => {
                                 e.preventDefault();
-                                const imageId = href.substring(1);
-                                const imageElement = document.getElementById(imageId);
-                                if (imageElement) {
-                                  imageElement.click();
+                                if (typeof window !== 'undefined' && (window as any).zoomableImages && (window as any).zoomableImages[imageId]) {
+                                  (window as any).zoomableImages[imageId].open();
                                 }
                               }}
-                              className="cursor-pointer text-blue-500 hover:text-blue-700"
-                            />
+                              className="text-black underline hover:text-blue-600 cursor-pointer"
+                            >
+                              {children}
+                            </a>
                           );
                         }
-                        return <a href={href} {...props} />;
+                        return <a href={href} {...props}>{children}</a>;
                       }
                     }}
                   >
-                    {convertRecordIdsToLinks(record.description)}
+                    {processText(convertRecordIdsToLinks(record.description, record.id), record.id)}
                   </Markdown>
                   {record.text && (
                     <div className="mt-2">
@@ -301,13 +331,13 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                     <div className="mt-2 flex-wrap flex items-center justify-left min-h-100 w-full">
                       {displayableAttachments.map((attachment, index) => (
                         <ZoomableImage
-                          className='w-100 pr-2 pb-2'
+                          key={`attachment-${record.id}-${index}`}
+                          src={attachment.url}
+                          alt={`Page ${index + 1}`}
                           width={100}
                           height={100}
-                          key={`attachment-prv-${index}`}
-                          id={`image-${index}`}
-                          src={attachment.url}
-                          alt={attachment.name}
+                          className="w-100 pr-2 pb-2"
+                          id={`image-${record.id}-${index}`}
                         />
                       ))}
                     </div>
@@ -352,7 +382,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                     </AccordionTrigger>
                     <AccordionContent>
                       <Markdown className={styles.markdown} remarkPlugins={[remarkGfm]}>
-                        {convertRecordIdsToLinks(record.text)}
+                        {processText(convertRecordIdsToLinks(record.text), record.id)}
                       </Markdown>
                     </AccordionContent>
                   </AccordionItem>

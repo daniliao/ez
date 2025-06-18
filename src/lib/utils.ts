@@ -143,7 +143,7 @@ export function findCodeBlocks(block: string, singleBlockMode = true) {
   }
 }
 
-export function convertRecordIdsToLinks(text: string): string {
+export function convertRecordIdsToLinks(text: string, recordId?: number): string {
   if (!text) return '';
   
   // Match patterns like "Record Id: 1, 2, 5" or "RecordIds: 1,2,5" (case insensitive)
@@ -159,11 +159,11 @@ export function convertRecordIdsToLinks(text: string): string {
   // Match patterns like "Page 4" or "page 4" or "p. 4" or "p.4"
   const pagePattern = /(?:page|p\.?)\s*(\d+)/gi;
   
-  // Then replace page references
+  // Then replace page references with record-specific IDs
   result = result.replace(pagePattern, (match, pageNum) => {
     // Convert to zero-based index for image array
     const imageIndex = parseInt(pageNum) - 1;
-    return `[${match}](#image-${imageIndex})`;
+    return `[${match}](#image-${recordId}-${imageIndex})`;
   });
 
   return result;

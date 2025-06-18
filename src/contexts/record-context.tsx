@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect, useContext, PropsWithChildre
 import { EncryptedAttachmentDTO, EncryptedAttachmentDTOEncSettings, RecordDTO } from '@/data/dto';
 import { RecordApiClient } from '@/data/client/record-api-client';
 import { ApiEncryptionConfig } from '@/data/client/base-api-client';
-import { DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record } from '@/data/client/models';
+import { DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record, PostParseCallback } from '@/data/client/models';
 import { ConfigContext, ConfigContextType } from '@/contexts/config-context';
 import { toast } from 'sonner';
 import { sort } from 'fast-sort';
@@ -73,7 +73,7 @@ export type RecordContextType = {
     downloadAttachment: (attachment: EncryptedAttachmentDTO, useCache: boolean) => void;
     convertAttachmentsToImages: (record: Record, statusUpdates: boolean) => Promise<DisplayableDataObject[]>;
     extraToRecord: (type: string, promptText: string, record: Record) => void;
-    parseRecord: (record: Record) => void;
+    parseRecord: (record: Record, postParseCallback?: PostParseCallback) => void;
     sendRecordToChat: (record: Record, forceRefresh: boolean) => void;
     sendAllRecordsToChat: (customMessage: CreateMessageEx | null, providerName?: string, modelName?: string, onResult?: OnResultCallback) => void;
 
@@ -94,6 +94,7 @@ export type RecordContextType = {
     exportRecords: () => void;
     importRecords: (zipFileInput: ArrayBuffer) => void;
     setRecordExtra: (record: Record, type: string, value: string) => Promise<void>;
+    translateRecord: (record: Record, language?: string) => Promise<void>;
 }
 
 export const RecordContext = createContext<RecordContextType | null>(null);
@@ -567,81 +568,66 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           return;
         }
 
-        let record = null;
+        let currentRecord = null;
         parseQueueInProgress = true;
         while (parseQueue.length > 0) {
           try {
-//            if (!chatContext.isStreaming) {
-              record = parseQueue[0] as Record;
-              console.log('Processing record: ', record, parseQueue.length);
-              // TODO: add OSS models and OCR support - #60, #59, #61
-              updateParseProgress(record, true);
-              
-              setOperationStatus(DataLoadingStatus.Loading);
-              const attachments = await convertAttachmentsToImages(record);
-              setOperationStatus(DataLoadingStatus.Success);
+            currentRecord = parseQueue[0] as Record;
+            console.log('Processing record: ', currentRecord, parseQueue.length);
+            updateParseProgress(currentRecord, true);
+            
+            setOperationStatus(DataLoadingStatus.Loading);
+            const attachments = await convertAttachmentsToImages(currentRecord);
+            setOperationStatus(DataLoadingStatus.Success);
 
-              // Parsing is two or thre stage operation: 1. OCR, 2. <optional> sensitive data removal, 3. LLM
-              const ocrProvider = await config?.getServerConfig('ocrProvider') || 'chatgpt';
-              console.log('Using OCR provider:', ocrProvider);
+            // Parsing is two or three stage operation: 1. OCR, 2. <optional> sensitive data removal, 3. LLM
+            const ocrProvider = await config?.getServerConfig('ocrProvider') || 'chatgpt';
+            console.log('Using OCR provider:', ocrProvider);
 
+            let updatedRecord: Record | null = null;
+            try {
               if (ocrProvider === 'chatgpt') {
-                await chatgptParseRecord(record, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+                updatedRecord = await chatgptParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
               } else if (ocrProvider === 'tesseract') {
-                await tesseractParseRecord(record, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+                updatedRecord = await tesseractParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
               } else if (ocrProvider === 'gemini') {
-                await geminiParseRecord(record, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+                updatedRecord = await geminiParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+              }
+
+              // Execute post-parse callback if exists
+              if (updatedRecord && currentRecord.postParseCallback) {
+                currentRecord.postParseCallback(updatedRecord);
               }
 
               // Check if auto-translation is enabled
               const autoTranslate = await config?.getServerConfig('autoTranslateRecord');
-              if (autoTranslate) {
-                try {
-                  // Send translation request to chat
-                  chatContext?.sendMessage({
-                    message: {
-                      role: 'user',
-                      createdAt: new Date(),
-                      content: prompts.translateRecord({ record, language: 'English' }),
-                    }, 
-                    onResult: async (result) => {
-                      if(result) {
-                        try {
-                          setOperationStatus(DataLoadingStatus.Loading);
-                          await updateRecordFromText(result.content, null, true, [
-                            { type: 'Reference record Ids', value: record.id?.toString() || '' }
-                          ]); // add as new record the translation with reference
-                        } finally {
-                          setOperationStatus(DataLoadingStatus.Success);
-                        }
-                      }
-                    }
-                  });
-                } catch (error) {
-                  console.error('Error auto-translating record:', error);
-                  toast.error('Error auto-translating record: ' + error);
-                }
+              if (autoTranslate && updatedRecord) {
+                await translateRecord(updatedRecord);
               }
+            } catch (error) {
+              console.error('Error processing record:', error);
+              toast.error('Error processing record: ' + error);
+              if (currentRecord) updateParseProgress(currentRecord, false, error);
+            }
 
-              console.log('Record parsed, taking next record', record);
-              parseQueue = parseQueue.slice(1); // remove one item
-              parseQueueLength = parseQueue.length;
-/*            } else {
-              console.log('Waiting for chat to finish streaming');
-              await new Promise(r => setTimeout(r, 1000));
-            }*/
+            console.log('Record parsed, taking next record', currentRecord);
+            parseQueue = parseQueue.slice(1); // remove one item
+            parseQueueLength = parseQueue.length;
           } catch (error) {
             parseQueue = parseQueue.slice(1); // remove one item
             parseQueueLength = parseQueue.length;
 
-            if (record) updateParseProgress(record, false, error);
+            if (currentRecord) updateParseProgress(currentRecord, false, error);
           }
         }
         parseQueueInProgress = false;
       }      
     
-      const parseRecord = async (newRecord: Record)=> {
+      const parseRecord = async (newRecord: Record, postParseCallback?: PostParseCallback)=> {
         if (!parseQueue.find(pr => pr.id === newRecord.id) && (newRecord.attachments.length > 0 || newRecord.transcription)) {
+          if (postParseCallback) {
+            newRecord.postParseCallback = postParseCallback;
+          }
           parseQueue.push(newRecord)
           parseQueueLength = parseQueue.length
           console.log('Added to parse queue: ', parseQueue.length);
@@ -854,6 +840,33 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         await updateRecord(record);
     }
 
+    const translateRecord = async (record: Record, language: string = 'English') => {
+      try {
+        chatContext?.sendMessage({
+          message: {
+            role: 'user',
+            createdAt: new Date(),
+            content: prompts.translateRecord({ record, language }),
+          }, 
+          onResult: async (result) => {
+            if(result) {
+              try {
+                setOperationStatus(DataLoadingStatus.Loading);
+                await updateRecordFromText(result.content, null, true, [
+                  { type: 'Reference record Ids', value: record.id?.toString() || '' }
+                ]); // add as new record the translation with reference
+              } finally {
+                setOperationStatus(DataLoadingStatus.Success);
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error translating record:', error);
+        toast.error('Error translating record: ' + error);
+      }
+    }
+
     return (
         <RecordContext.Provider
             value={{
@@ -892,7 +905,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                  importRecords,
                  recordDialogOpen,
                  setRecordDialogOpen,
-                 setRecordExtra
+                 setRecordExtra,
+                 translateRecord
                 }}
         >
             {children}

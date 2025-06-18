@@ -325,14 +325,14 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
             }} />) : null }
             {recordContext?.currentRecord && recordContext?.recordEditMode ? (
               <div>
-                <div className="mb-4">
+                {/* <div className="mb-4">
                   <label className="text-sm font-medium mb-2 block">Description</label>
                   <Textarea
                     {...register("note")}
                     placeholder="Enter a brief description..."
                     className="w-full"
                   />
-                </div>
+                </div> */}
                 <label className="text-sm font-medium mb-2 block">Full Text (Markdown)</label>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                   <TabsList className="grid w-full grid-cols-2">

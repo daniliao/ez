@@ -156,6 +156,7 @@ export const recordItemSchema = z.object({
   
 export type RecordItem = z.infer<typeof recordItemSchema>;
 
+export type PostParseCallback = (record: Record) => void;
 
 export class Record {
     id?: number;
@@ -178,6 +179,7 @@ export class Record {
 
     parseInProgress: boolean = false;
     parseError: any = null;
+    postParseCallback?: PostParseCallback;
   
     constructor(recordSource: RecordDTO | Record) {
       this.id = recordSource.id;

@@ -15,6 +15,7 @@ import { ChatContext } from '@/contexts/chat-context';
 import { promptTemplates } from '@/data/ai/prompt-templates';
 import { QuestionMarkIcon } from '@radix-ui/react-icons';
 import { ConfigContext } from '@/contexts/config-context';
+import { toast } from 'sonner';
 
 interface Props {
     record: Record;
@@ -153,26 +154,17 @@ const RecordItemCommands: React.FC<Props> = ({ record, folder, open, setOpen }) 
             <CommandGroup heading="Translations">
                 {supportedLanguages.map((item) => (
                     <CommandItem key={item.code}  onSelect={(v) => {
-                        chatContext.setChatOpen(true);
-                        chatContext.sendMessage({
-                          message: {
-                            role: 'user',
-                            createdAt: new Date(),
-                            content: prompts.translateRecord({ record, language: item.name }),
-                          }, 
-                          onResult: async (result) => {
-                            if(result) {
-                                try {
-                                    recordContext?.setOperationStatus(DataLoadingStatus.Loading);
-                                    await recordContext?.updateRecordFromText(result.content, null, true, [
-                                        { type: 'Reference record Ids', value: record.id?.toString() || '' }
-                                    ]); // add as new record the translation with reference
-                                } finally {
-                                    recordContext?.setOperationStatus(DataLoadingStatus.Success);
-                                }
-                            }
-                          }
-                        });
+                        if (record.parseInProgress) {
+                            toast.info('Please wait until record is successfully parsed');
+                            return;
+                        }
+                        if (record.json) {
+                            recordContext?.translateRecord(record, item.name);
+                        } else {
+                            recordContext?.parseRecord(record, (parsedRecord) => {
+                                recordContext?.translateRecord(parsedRecord, item.name);
+                            });
+                        }
                     }} className="text-xs"><LanguagesIcon /> Translate to {item.name} ({item.country})</CommandItem>
                 ))}
             </CommandGroup>

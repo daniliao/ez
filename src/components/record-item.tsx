@@ -443,26 +443,17 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
             <DownloadIcon className="w-4 h-4" />
           </Button>
           <Button size="icon" variant="ghost" title="Translate to English" onClick={() => {
-            chatContext?.setChatOpen(true);
-            chatContext?.sendMessage({
-              message: {
-                role: 'user',
-                createdAt: new Date(),
-                content: prompts.translateRecord({ record, language: 'English' }),
-              }, 
-              onResult: async (result) => {
-                if(result) {
-                  try {
-                    recordContext?.setOperationStatus(DataLoadingStatus.Loading);
-                    await recordContext?.updateRecordFromText(result.content, null, true, [
-                      { type: 'Reference record Ids', value: record.id?.toString() || '' }
-                    ]); // add as new record the translation with reference
-                  } finally {
-                    recordContext?.setOperationStatus(DataLoadingStatus.Success);
-                  }
-                }
-              }
-            });
+            if (record.parseInProgress) {
+              toast.info('Please wait until record is successfully parsed');
+              return;
+            }
+            if (record.json) {
+              recordContext?.translateRecord(record);
+            } else {
+              recordContext?.parseRecord(record, (parsedRecord) => {
+                recordContext?.translateRecord(parsedRecord);
+              });
+            }
           }}>
             <Languages className="w-4 h-4" />
           </Button>

@@ -1,4 +1,3 @@
-    
 import { DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record } from '@/data/client/models';
 import { findCodeBlocks } from "@/lib/utils";
 import { AIResultEventType, ChatContextType, MessageType, MessageVisibility } from '@/contexts/chat-context';
@@ -8,7 +7,7 @@ import { RecordContextType } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Record|null,  updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<AIResultEventType> {
+export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>,  updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
 
@@ -32,13 +31,14 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                     updateParseProgress(record, false, null);
                     resultMessage.recordSaved = true;
                     await record.updateChecksumLastParsed();
-                    updateRecordFromText(resultMessage.content, record, false);
-                }
-
-                if(result.finishReason === 'error') {
-                    reject(result);
+                    const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);
+                    if (updatedRecord) {
+                        resolve(updatedRecord);
+                    } else {
+                        reject(new Error('Failed to update record'));
+                    }
                 } else {
-                    resolve(result);
+                    reject(result);
                 }
             },
             providerName: parseAIProvider,

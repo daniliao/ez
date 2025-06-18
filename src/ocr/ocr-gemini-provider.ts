@@ -7,7 +7,7 @@ import { RecordContextType } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Record|null, updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<AIResultEventType> {
+export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const geminiApiKey = await configContext?.getServerConfig('geminiApiKey') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
@@ -19,8 +19,6 @@ export async function parse(record: Record, chatContext: ChatContextType, config
 
     return new Promise(async (resolve, reject) => {
         try {
-
-
             // Prepare the prompt
             const prompt = record.transcription ? 
                 prompts.recordParseMultimodalTranscription({ record, config: configContext }) :
@@ -45,8 +43,12 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                         updateParseProgress(record, false, null);
                         resultMessage.recordSaved = true;
                         await record.updateChecksumLastParsed();
-                        updateRecordFromText(resultMessage.content, record, false);
-                        resolve(result);
+                        const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);
+                        if (updatedRecord) {
+                            resolve(updatedRecord);
+                        } else {
+                            reject(new Error('Failed to update record'));
+                        }
                     } else {
                         reject(result);
                     }

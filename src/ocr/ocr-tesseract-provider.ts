@@ -40,7 +40,7 @@ const processFiles = async (files: DisplayableDataObject[], selectedLanguage: st
 
   }
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Record|null, updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<AIResultEventType>  {
+export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record>  {
     return new Promise (async (resolve, reject) => {
 
         // TODO: add Tesseract parsing logic - then LLM - it should be configurable whichh LLM is being used for data parsing from tesseract text
@@ -71,12 +71,15 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                         resultMessage.recordRef = record;
                         updateParseProgress(record, false, null);
                         await record.updateChecksumLastParsed();
-                        updateRecordFromText(resultMessage.content, record, false);
-                        resolve(result);
+                        const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);
+                        if (updatedRecord) {
+                            resolve(updatedRecord);
+                        } else {
+                            reject(new Error('Failed to update record'));
+                        }
                     } else {
                         reject(result);
                     }
-                    
                 },
                 providerName: parseAIProvider
             });
@@ -99,7 +102,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             }
             console.log('Removing PII Tokens: ', piiTokens)
             textAfterOcr = removePII(textAfterOcr, piiTokens, '***');
-        } 
+        }
         
         if(removePIIMode === 'ollama' || removePIIMode === 'both') {
             const ollamaUrl = await configContext?.getServerConfig('ollamaUrl') as string;

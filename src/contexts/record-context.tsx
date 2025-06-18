@@ -211,7 +211,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
               if (record.json) {
                 const discoveredEventDate = getTS(new Date((record.json.length > 0 ? record.json.find(item => item.test_date)?.test_date || record.json.find(item => item.admission_date)?.admission_date : record?.createdAt) || record.createdAt));
-                record.eventDate = discoveredEventDate;
+                if (discoveredEventDate) {
+                  record.eventDate = discoveredEventDate;
+                }
               }
 
             }

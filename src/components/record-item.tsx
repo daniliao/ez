@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState, ReactNode } from "react";
-import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon } from "lucide-react";
+import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import Markdown from "react-markdown";
@@ -442,7 +442,23 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
           <Button size="icon" variant="ghost" title="Download record as HTML" onClick={() => downloadAsHtml(record.text || record.description, `record-${record.id}`)}>
             <DownloadIcon className="w-4 h-4" />
           </Button>
-          <Button size="icon" variant="ghost" title="Translate to English" onClick={() => {
+          <Button size="icon" variant="ghost" title="Parse record" onClick={async () => {
+            if (record.parseInProgress) {
+              toast.info('Record parsing already in progress');
+              return;
+            }
+            const autoTranslate = await config?.getServerConfig('autoTranslateRecord');
+            if (autoTranslate) {
+              recordContext?.parseRecord(record, async (parsedRecord) => {
+                await recordContext?.translateRecord(parsedRecord);
+              });
+            } else {
+              recordContext?.parseRecord(record);
+            }
+          }}>
+            <FileText className="w-4 h-4" />
+          </Button>
+          <Button size="icon" variant="ghost" title="Translate to English" onClick={async () => {
             if (record.parseInProgress) {
               toast.info('Please wait until record is successfully parsed');
               return;
@@ -450,8 +466,8 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
             if (record.json) {
               recordContext?.translateRecord(record);
             } else {
-              recordContext?.parseRecord(record, (parsedRecord) => {
-                recordContext?.translateRecord(parsedRecord);
+              recordContext?.parseRecord(record, async (parsedRecord) => {
+                await recordContext?.translateRecord(parsedRecord);
               });
             }
           }}>

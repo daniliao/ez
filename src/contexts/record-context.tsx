@@ -596,13 +596,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
               // Execute post-parse callback if exists
               if (updatedRecord && currentRecord.postParseCallback) {
-                currentRecord.postParseCallback(updatedRecord);
-              }
-
-              // Check if auto-translation is enabled
-              const autoTranslate = await config?.getServerConfig('autoTranslateRecord');
-              if (autoTranslate && updatedRecord) {
-                await translateRecord(updatedRecord);
+                await currentRecord.postParseCallback(updatedRecord);
               }
             } catch (error) {
               console.error('Error processing record:', error);

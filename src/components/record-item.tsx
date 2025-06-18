@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
@@ -39,6 +39,27 @@ const RecordItemExtra = dynamic(() =>
   import('@/components/record-item-extra').then((mod) => mod.default)
 )
 
+const MarkdownLinkHandler = ({node, href, children, ...props}: {node?: any; href?: string; children?: ReactNode; [key: string]: any}) => {
+  if (href?.includes('image-')) {
+    const imageId = href.startsWith('#') ? href.substring(1) : href;
+    return (
+      <a
+        href="#"
+        {...props}
+        onClick={(e) => {
+          e.preventDefault();
+          if (typeof window !== 'undefined' && (window as any).zoomableImages && (window as any).zoomableImages[imageId]) {
+            (window as any).zoomableImages[imageId].open();
+          }
+        }}
+        className="text-black underline hover:text-blue-600 cursor-pointer"
+      >
+        {children}
+      </a>
+    );
+  }
+  return <a href={href} {...props}>{children}</a>;
+};
 
 export default function RecordItem({ record, displayAttachmentPreviews }: { record: Record, displayAttachmentPreviews: boolean }) {
   // TODO: refactor and extract business logic to a separate files
@@ -150,19 +171,8 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const processText = (text: string | undefined | null, recordId: string | number | undefined) => {
     if (!recordId || !text) return '';
     
-    // First handle any existing markdown links
-    let processed = text.replace(/\[Page (\d+)\]\(#image-[\d-]+\)/g, (match, pageNum) => {
-      const imageId = `image-${recordId}-${parseInt(pageNum) - 1}`;
-      return `[Page ${pageNum}](#${imageId})`;
-    });
-
-    // Then handle plain "Page X" text (not already in a link)
-    processed = processed.replace(/Page (\d+)(?!\]|\))/g, (match, pageNum) => {
-      const imageId = `image-${recordId}-${parseInt(pageNum) - 1}`;
-      return `[Page ${pageNum}](#${imageId})`;
-    });
-
-    return processed;
+    // Keep the text as is - it's already in the correct markdown format
+    return text;
   };
 
   return (
@@ -249,6 +259,21 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
             })()}
           </div>
         )}
+        <div className="hidden">
+          {displayAttachmentPreviews && record.attachments.length > 0 && displayableAttachments.length > 0 && (
+            displayableAttachments.map((attachment, index) => (
+              <ZoomableImage
+                key={`attachment-${record.id}-${index}`}
+                src={attachment.url}
+                alt={`Page ${index + 1}`}
+                width={100}
+                height={100}
+                className="w-100 pr-2 pb-2"
+                id={`image-${record.id}-${index}`}
+              />
+            ))
+          )}
+        </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full text-sm">
           {(record.json || record.extra || record.transcription) ? (
             <TabsList className="grid grid-cols-2 gap-2">
@@ -263,30 +288,10 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                     className={styles.markdown} 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      a: ({node, href, children, ...props}: {node?: any; href?: string; children?: React.ReactNode; [key: string]: any}) => {
-                        if (href?.includes('image-')) {
-                          const imageId = href.startsWith('#') ? href.substring(1) : href;
-                          return (
-                            <a
-                              href="#"
-                              {...props}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                if (typeof window !== 'undefined' && (window as any).zoomableImages && (window as any).zoomableImages[imageId]) {
-                                  (window as any).zoomableImages[imageId].open();
-                                }
-                              }}
-                              className="text-black underline hover:text-blue-600 cursor-pointer"
-                            >
-                              {children}
-                            </a>
-                          );
-                        }
-                        return <a href={href} {...props}>{children}</a>;
-                      }
+                      a: MarkdownLinkHandler
                     }}
                   >
-                    {processText(convertRecordIdsToLinks(record.description, record.id), record.id)}
+                    {convertRecordIdsToLinks(record.description, record.id)}
                   </Markdown>
                   {record.text && (
                     <div className="mt-2">
@@ -326,21 +331,31 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                     <div key={index} className="text-sm inline-flex w-auto"><Button variant="outline" onClick={() => recordContext?.downloadAttachment(attachment.toDTO(), false)}><PaperclipIcon className="w-4 h-4 mr-2" /> {shorten(attachment.displayName)}</Button></div>
                   ))}
                 </div>
+
+                {displayAttachmentPreviews && record.attachments.length > 0 && displayableAttachments.length > 0 && (
+                  <div className="mt-2 flex-wrap flex items-center justify-left min-h-100 w-full">
+                    {displayableAttachments.map((attachment, index) => (
+                      <img
+                        key={`thumb-${record.id}-${index}`}
+                        src={attachment.url}
+                        alt={`Page ${index + 1}`}
+                        width={100}
+                        height={100}
+                        className="w-100 pr-2 pb-2 cursor-pointer"
+                        onClick={() => {
+                          if (typeof window !== 'undefined' && (window as any).zoomableImages) {
+                            const imageId = `image-${record.id}-${index}`;
+                            (window as any).zoomableImages[imageId]?.open();
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
                 {displayAttachmentPreviews && record.attachments.length > 0 ? (
                   displayableAttachments.length > 0 ? (
-                    <div className="mt-2 flex-wrap flex items-center justify-left min-h-100 w-full">
-                      {displayableAttachments.map((attachment, index) => (
-                        <ZoomableImage
-                          key={`attachment-${record.id}-${index}`}
-                          src={attachment.url}
-                          alt={`Page ${index + 1}`}
-                          width={100}
-                          height={100}
-                          className="w-100 pr-2 pb-2"
-                          id={`image-${record.id}-${index}`}
-                        />
-                      ))}
-                    </div>
+                    null
                   ): (displayableAttachmentsInProgress ? (<div className="mt-2 text-sm text-muted-foreground flex h-4 content-center gap-2 mb-4">
                       <div role="status" className="w-4">
                           <svg aria-hidden="true" className="w-4 h-4 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -381,8 +396,14 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
-                      <Markdown className={styles.markdown} remarkPlugins={[remarkGfm]}>
-                        {processText(convertRecordIdsToLinks(record.text), record.id)}
+                      <Markdown 
+                        className={styles.markdown} 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: MarkdownLinkHandler
+                        }}
+                      >
+                        {convertRecordIdsToLinks(record.text || '', record.id)}
                       </Markdown>
                     </AccordionContent>
                   </AccordionItem>

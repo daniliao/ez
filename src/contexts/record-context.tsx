@@ -34,6 +34,38 @@ import { AuditContext } from './audit-context';
 import { SaaSContext } from './saas-context';
 import { nanoid } from 'nanoid';
 
+// Add the helper function before the parseQueueInProgress variable
+const discoverEventDate = (record: Record): string => {
+  if (record.eventDate) {
+    return record.eventDate;
+  }
+
+  if (record.json && Array.isArray(record.json)) {
+    // Try to find any date field in the JSON data
+    const dateFields = ['test_date', 'admission_date', 'visit_date', 'procedure_date', 'examination_date', 'date'] as const;
+    
+    for (const field of dateFields) {
+      const item = record.json.find(item => {
+        const value = item as { [key: string]: unknown };
+        return value[field] !== undefined;
+      });
+      
+      if (item) {
+        const value = item as { [key: string]: unknown };
+        const foundDate = value[field];
+        if (foundDate && (typeof foundDate === 'string' || foundDate instanceof Date)) {
+          const parsedDate = getTS(new Date(foundDate));
+          if (parsedDate) {
+            return parsedDate;
+          }
+        }
+      }
+    }
+  }
+
+  // If no specific date found, use createdAt as fallback
+  return record.createdAt;
+};
 
 let parseQueueInProgress = false;
 let parseQueue:Record[] = []
@@ -206,17 +238,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               }
 
             }
-            if (!record.eventDate) {
-              record.eventDate = record.createdAt; // backward compatibility for #150
 
-              if (record.json) {
-                const discoveredEventDate = getTS(new Date((record.json.length > 0 ? record.json.find(item => item.test_date)?.test_date || record.json.find(item => item.admission_date)?.admission_date : record?.createdAt) || record.createdAt));
-                if (discoveredEventDate) {
-                  record.eventDate = discoveredEventDate;
-                }
-              }
-
-            }
+            // Use the helper function to discover event date
+            record.eventDate = discoverEventDate(record);
 
             const recordDTO = record.toDTO(); // DTOs are common ground between client and server
             const response = await client.put(recordDTO);

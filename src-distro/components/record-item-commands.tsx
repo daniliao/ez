@@ -161,7 +161,7 @@ const RecordItemCommands: React.FC<Props> = ({ record, folder, open, setOpen }) 
                         if (record.json) {
                             recordContext?.translateRecord(record, item.name);
                         } else {
-                            recordContext?.parseRecord(record, (parsedRecord) => {
+                            recordContext?.parseRecord(record, async (parsedRecord) => {
                                 recordContext?.translateRecord(parsedRecord, item.name);
                             });
                         }

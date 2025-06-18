@@ -886,13 +886,12 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     const translateRecord = async (record: Record, language: string = 'English') => {
       try {
         return new Promise<Record>((resolve, reject) => {
-          chatContext?.sendMessage({
-            message: {
+          chatContext?.aiDirectCall([{
+              id: nanoid(),
               role: 'user',
               createdAt: new Date(),
               content: prompts.translateRecord({ record, language }),
-            }, 
-            onResult: async (result) => {
+          }], async (result) => {
               if(result) {
                 try {
                   setOperationStatus(DataLoadingStatus.Loading);
@@ -940,7 +939,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 reject(new Error('No translation result received'));
               }
             }
-          });
+          );
         });
       } catch (error) {
         console.error('Error translating record:', error);

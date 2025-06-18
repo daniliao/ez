@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState } from "react";
-import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages } from "lucide-react";
+import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import Markdown from "react-markdown";
@@ -53,6 +53,8 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const [isVisible, setIsVisible] = useState(false);
   const [lastlyLoadedCacheKey, setLastlyLoadedCacheKey] = useState('');
   const [isTextExpanded, setIsTextExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState('text');
+  const [textAccordionValue, setTextAccordionValue] = useState('');
 
   const [displayableAttachments, setDisplayableAttachments] = useState<DisplayableDataObject[]>([]);
 
@@ -217,16 +219,35 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
             })()}
           </div>
         )}
-        <Tabs defaultValue="text" className="w-full text-sm">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full text-sm">
           {(record.json || record.extra || record.transcription) ? (
             <TabsList className="grid grid-cols-2 gap-2">
-              <TabsTrigger value="text" className="dark:data-[state=active]:bg-zinc-900 data-[state=active]:bg-zinc-100 rounded-md p-2">Basic view</TabsTrigger>
-              <TabsTrigger value="json" className="dark:data-[state=active]:bg-zinc-900 data-[state=active]:bg-zinc-100 rounded-md p-2">Detailed view</TabsTrigger>
+              <TabsTrigger value="text" className="dark:data-[state=active]:bg-zinc-900 data-[state=active]:bg-zinc-300 rounded-md p-2">Basic view</TabsTrigger>
+              <TabsTrigger value="json" className="dark:data-[state=active]:bg-zinc-900 data-[state=active]:bg-zinc-300 rounded-md p-2">Detailed view</TabsTrigger>
             </TabsList>
           ): ''}
             <TabsContent value="text" className="max-w-600">
               {record.description ? (
-                <div className="mt-5 rose text-sm text-muted-foreground"><Markdown className={styles.markdown} remarkPlugins={[remarkGfm]}>{convertRecordIdsToLinks(record.description)}</Markdown></div>
+                <div className="mt-5 rose text-sm text-muted-foreground">
+                  <Markdown className={styles.markdown} remarkPlugins={[remarkGfm]}>{convertRecordIdsToLinks(record.description)}</Markdown>
+                  {record.text && (
+                    <div className="mt-2">
+                      <Button 
+                        variant="link" 
+                        className="underline hover:text-blue-500 cursor-pointer p-0"
+                        onClick={() => {
+                          setActiveTab('json');
+                          // Small delay to ensure tab content is rendered
+                          setTimeout(() => {
+                            setTextAccordionValue('item-1');
+                          }, 100);
+                        }}
+                      >
+                        <BookTextIcon className="w-4 h-4 mr-2" /> Read full record text
+                      </Button>
+                    </div>
+                  )}
+                </div>
               ): '' }
               <div className="mt-2 flex flex-wrap items-center gap-2 w-100">
                 {record.tags && record.tags.length > 0 ? (
@@ -276,7 +297,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
             <TabsContent value="json" className="max-w-600">
               <div className="mt-2 flex flex-wrap items-center gap-2 w-100">
               {record.text ? (
-                  <Accordion type="single" collapsible className="w-full">
+                  <Accordion type="single" collapsible className="w-full" value={textAccordionValue} onValueChange={setTextAccordionValue}>
                   <AccordionItem value="item-1">
                     <AccordionTrigger className="flex justify-between">
                       <span>Full text extracted from files</span>

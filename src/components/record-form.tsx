@@ -314,13 +314,26 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
           <CredenzaTitle>{folder?.displayName()}</CredenzaTitle>
         </CredenzaHeader>
         <div className="mb-6 bg-white dark:bg-zinc-900 p-4 rounded-lg shadow-sm">
-          <div className="text-sm p-5">Upload files (PDF, JPG, PNG) with your health data - eg. blood results, MRI ...</div>
+          { recordContext?.currentRecord && recordContext?.recordEditMode ? (
+            (null)
+          ) : (
+            <div className="text-sm mb-4">Upload files (PDF, JPG, PNG) with your health data - eg. blood results, MRI ...</div>
+          )}
           <form onSubmit={handleSubmit(onSubmit)}>
             { mode === RecordEditMode.VoiceRecorder && ((recordContext?.recordEditMode && recordContext?.currentRecord?.transcription || !recordContext?.recordEditMode)) ? (<VoiceRecorder prevTranscription={transcription} chatGptKey={chatGptApiKey} onTranscriptionChange={(trs) => {
               setTranscription(trs);
             }} />) : null }
             {recordContext?.currentRecord && recordContext?.recordEditMode ? (
               <div>
+                <div className="mb-4">
+                  <label className="text-sm font-medium mb-2 block">Description</label>
+                  <Textarea
+                    {...register("note")}
+                    placeholder="Enter a brief description..."
+                    className="w-full"
+                  />
+                </div>
+                <label className="text-sm font-medium mb-2 block">Full Text (Markdown)</label>
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="edit" className="flex gap-2">

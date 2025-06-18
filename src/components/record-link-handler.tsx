@@ -62,7 +62,7 @@ export default function RecordLinkHandler() {
             <RecordItem 
               key={record.id} 
               record={record} 
-              displayAttachmentPreviews={false}
+              displayAttachmentPreviews={true}
             />
           ))}
         </div>

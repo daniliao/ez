@@ -319,21 +319,6 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
             })()}</div>
           </div>
         )}
-        <div className="hidden">
-          {displayAttachmentPreviews && record.attachments.length > 0 && displayableAttachments.length > 0 && (
-            displayableAttachments.map((attachment, index) => (
-              <ZoomableImage
-                key={`attachment-${record.id}-${index}`}
-                src={attachment.url}
-                alt={`Page ${index + 1}`}
-                width={100}
-                height={100}
-                className="w-100 pr-2 pb-2"
-                id={`image-${record.id}-${index}`}
-              />
-            ))
-          )}
-        </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full text-sm">
           {(record.json || record.extra || record.transcription) ? (
             <TabsList className="grid grid-cols-2 gap-2">
@@ -371,107 +356,93 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                     </div>
                   )}
                 </div>
-              ): '' }
-              <div className="mt-2 flex flex-wrap items-center gap-2 w-100">
-                {record.tags && record.tags.length > 0 ? (
+              ) : null}
+              
+              {record.tags && record.tags.length > 0 && (
                 <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
                   {record.tags.sort((a, b) => a.localeCompare(b)).map((tag, index) => (
-                    <div key={index} className="text-sm inline-flex w-auto"><Button variant={recordContext?.filterSelectedTags.includes(tag) ? 'default' : 'outline' }  onClick={() => {
-                      if (folderContext?.currentFolder) {
-                        recordContext?.filterToggleTag(tag);
-                      }      
-                    }
-                  }><TagIcon className="w-4 h-4 mr-2" /> {shorten(tag)}{recordContext?.filterSelectedTags.includes(tag)? (<XCircleIcon className="w-4 h-4 ml-2" />) : null }</Button></div>
-                  ))}
-                </div>
-                ): '' }
-
-                <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
-                  {record.attachments.map((attachment, index) => (
-                    <div key={index} className="text-sm inline-flex w-auto"><Button variant="outline" onClick={() => recordContext?.downloadAttachment(attachment.toDTO(), false)}><PaperclipIcon className="w-4 h-4 mr-2" /> {shorten(attachment.displayName)}</Button></div>
-                  ))}
-                </div>
-
-                {displayAttachmentPreviews && record.attachments.length > 0 && displayableAttachments.length > 0 && (
-                  <div className="mt-2 flex-wrap flex items-center justify-left min-h-100 w-full">
-                    {displayableAttachments.map((attachment, index) => (
-                      <img
-                        key={`thumb-${record.id}-${index}`}
-                        src={attachment.url}
-                        alt={`Page ${index + 1}`}
-                        width={100}
-                        height={100}
-                        className="w-100 pr-2 pb-2 cursor-pointer"
+                    <div key={index} className="text-sm inline-flex w-auto">
+                      <Button 
+                        variant={recordContext?.filterSelectedTags.includes(tag) ? 'default' : 'outline'}  
                         onClick={() => {
-                          if (typeof window !== 'undefined' && (window as any).zoomableImages) {
-                            const imageId = `image-${record.id}-${index}`;
-                            (window as any).zoomableImages[imageId]?.open();
-                          }
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {displayAttachmentPreviews && record.attachments.length > 0 ? (
-                  displayableAttachments.length > 0 ? (
-                    null
-                  ): (displayableAttachmentsInProgress ? (<div className="mt-2 text-sm text-muted-foreground flex h-4 content-center gap-2 mb-4">
-                      <div role="status" className="w-4">
-                          <svg aria-hidden="true" className="w-4 h-4 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
-                              <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
-                          </svg>
-                      </div>          
-                      Loading previews ...
-                    </div>): null)
-                ) : null}              
-                </div>
-            </TabsContent>
-            <TabsContent value="json" className="max-w-600">
-              <div className="mt-2 flex flex-wrap items-center gap-2 w-100">
-              {record.text ? (
-                  <Accordion type="single" collapsible className="w-full" value={textAccordionValue} onValueChange={setTextAccordionValue}>
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger className="flex justify-between">
-                      <span>Full text extracted from files</span>
-                      <div className="flex gap-2">
-                        <Button size="icon" variant="ghost" title="Edit text" onClick={(e) => {
-                          e.stopPropagation(); // Prevent accordion from toggling
-                          if(record.parseInProgress) { 
-                            toast.info('Please wait until record is successfully parsed') 
-                          } else {  
-                            recordContext?.setCurrentRecord(record);  
-                            recordContext?.setRecordEditMode(true); 
-                          }
-                        }}>
-                          <PencilIcon className="w-4 h-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" title="Download as HTML" onClick={(e) => {
-                          e.stopPropagation(); // Prevent accordion from toggling
-                          downloadAsHtml(record.text, `record-${record.id}-text`);
-                        }}>
-                          <DownloadIcon className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <Markdown 
-                        className={styles.markdown} 
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          a: MarkdownLinkHandler
+                          if (folderContext?.currentFolder) {
+                            recordContext?.filterToggleTag(tag);
+                          }      
                         }}
                       >
-                        {convertRecordIdsToLinks(record.text || '', record.id)}
-                      </Markdown>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-                ): null }
+                        <TagIcon className="w-4 h-4 mr-2" /> 
+                        {shorten(tag)}
+                        {recordContext?.filterSelectedTags.includes(tag) && (
+                          <XCircleIcon className="w-4 h-4 ml-2" />
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {record.attachments.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
+                  {record.attachments.map((attachment, index) => (
+                    <div key={index} className="text-sm inline-flex w-auto">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => recordContext?.downloadAttachment(attachment.toDTO(), false)}
+                      >
+                        <PaperclipIcon className="w-4 h-4 mr-2" /> 
+                        {shorten(attachment.displayName)}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="json" className="max-w-600">
+              <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
+                {record.text && (
+                  <Accordion type="single" collapsible className="w-full" value={textAccordionValue} onValueChange={setTextAccordionValue}>
+                    <AccordionItem value="item-1">
+                      <AccordionTrigger className="flex justify-between">
+                        <span>Full text extracted from files</span>
+                        <div className="flex gap-2">
+                          <Button size="icon" variant="ghost" title="Edit text" onClick={(e) => {
+                            e.stopPropagation(); // Prevent accordion from toggling
+                            if(record.parseInProgress) { 
+                              toast.info('Please wait until record is successfully parsed') 
+                            } else {  
+                              recordContext?.setCurrentRecord(record);  
+                              recordContext?.setRecordEditMode(true); 
+                            }
+                          }}>
+                            <PencilIcon className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" title="Download as HTML" onClick={(e) => {
+                            e.stopPropagation(); // Prevent accordion from toggling
+                            downloadAsHtml(record.text, `record-${record.id}-text`);
+                          }}>
+                            <DownloadIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <Markdown 
+                          className={styles.markdown} 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            a: MarkdownLinkHandler
+                          }}
+                        >
+                          {convertRecordIdsToLinks(record.text || '', record.id)}
+                        </Markdown>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                )}
+                
                 <RecordItemJson record={record} />
                 <RecordItemExtra record={record} />
-                {record.transcription ? (
+                
+                {record.transcription && (
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="item-1">
                       <AccordionTrigger>Transcription</AccordionTrigger>
@@ -480,8 +451,9 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                       </AccordionContent>
                     </AccordionItem>
                   </Accordion>
-                ) : null}
-                <div className="grid grid-cols-2 text-xs text-zinc-500">
+                )}
+                
+                <div className="grid grid-cols-2 text-xs text-zinc-500 w-full mt-4">
                   <div className="text-xs text-muted-foreground">Record ID</div>
                   <div className="text-xs">{record.id}</div>
                   <div className="text-xs text-muted-foreground">Created at:</div>
@@ -492,6 +464,33 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
               </div>
             </TabsContent>
         </Tabs>
+        {displayAttachmentPreviews && record.attachments.length > 0 && displayableAttachments && (
+          displayableAttachments.length > 0 ? (
+            <div className="mt-4 flex-wrap flex items-center justify-left min-h-100 w-full">
+              {displayableAttachments.map((attachment, index) => (
+                <ZoomableImage
+                  key={`attachment-${record.id}-${index}`}
+                  src={attachment.url}
+                  alt={`Page ${index + 1}`}
+                  width={100}
+                  height={100}
+                  className="w-100 pr-2 pb-2 cursor-pointer"
+                  id={`image-${record.id}-${index}`}
+                />
+              ))}
+            </div>
+          ) : displayableAttachmentsInProgress ? (
+            <div className="mt-4 text-sm text-muted-foreground flex h-4 content-center gap-2 mb-4">
+              <div role="status" className="w-4">
+                <svg aria-hidden="true" className="w-4 h-4 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
+                  <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
+                </svg>
+              </div>          
+              Loading previews ...
+            </div>
+          ) : null
+        )}
         <div ref={thisElementRef} className="mt-2 flex items-center gap-2">
           <Button size="icon" variant="ghost" title="Edit record" onClick={() => { if(record.parseInProgress) { toast.info('Please wait until record is successfully parsed') } else {  recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true); } }}>
             <PencilIcon className="w-4 h-4" />
@@ -542,14 +541,18 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>         
-          {(record.json) ? (
-            <Button className="h-6 text-xs" variant="ghost" title="AI features">
-              Ready for AI: <Wand2Icon className="ml-3 w-4 h-4"  onClick={() => { setCommandsOpen(true) }} />
-                <RecordItemCommands record={record} folder={folderContext?.currentFolder} open={commandsOpen} setOpen={setCommandsOpen} />
-            </Button>                
-          ): ((record.attachments && record.attachments.length || record.transcription) ? (<Button className="h-6 text-xs" variant="ghost" title="Parse again">
-            Try parse again: <RefreshCw className="ml-3 w-4 h-4" onClick={() => { recordContext?.parseRecord(record); }}/>
-            </Button>) : null) }      
+          {record.json ? (
+            <>
+              <Button className="h-6 text-xs" variant="ghost" title="AI features" onClick={() => { setCommandsOpen(true) }}>
+                Ready for AI: <Wand2Icon className="ml-3 w-4 h-4" />
+              </Button>
+              <RecordItemCommands record={record} folder={folderContext?.currentFolder} open={commandsOpen} setOpen={setCommandsOpen} />
+            </>
+          ) : record.attachments?.length > 0 || record.transcription ? (
+            <Button className="h-6 text-xs" variant="ghost" title="Parse again" onClick={() => { recordContext?.parseRecord(record); }}>
+              Try parse again: <RefreshCw className="ml-3 w-4 h-4" />
+            </Button>
+          ) : null}      
         </div>
       </div>
     )

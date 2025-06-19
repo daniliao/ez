@@ -55,7 +55,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                 // Clean up pageText before saving
                 pageText = pageText.replace(/```[a-zA-Z]*\n?|```/g, '');
                 recordText += pageText + '\n\r\n\r';
-                record =await updateParseProgress(record, true, page, sourceImages.length, { pageDelta: pageText, recordText: recordText }, null);
+                record = await updateParseProgress(record, true, page, sourceImages.length, { pageDelta: pageText, recordText: recordText }, null); //saves the record
 
                 page++;
             }

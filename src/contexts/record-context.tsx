@@ -134,7 +134,7 @@ export type RecordContextType = {
 
     exportRecords: () => void;
     importRecords: (zipFileInput: ArrayBuffer) => void;
-    setRecordExtra: (record: Record, type: string, value: string) => Promise<void>;
+    setRecordExtra: (record: Record, type: string, value: string) => Promise<Record>;
     removeRecordExtra: (record: Record, type: string) => Promise<void>;
     translateRecord: (record: Record, language?: string) => Promise<Record>;
     parsingProgressByRecordId: {
@@ -659,19 +659,18 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             recordText: metadata?.recordText
           }
 
-          if (metadata && metadata.pageDelta && metadata.recordText) {
+          if (metadata && metadata.pageDelta && metadata.recordText) { // new page parsed
             record.text = metadata.recordText;
-            setRecordExtra(record, 'Page ' + progress.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
+            record = await setRecordExtra(record, 'Page ' + progress.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
 
-            if (progress === progressOf) {
-              removeRecordExtra(record, 'Document parsed pages');
+            if (progress === (progressOf - 1)) {
+              removeRecordExtra(record, 'Document parsed pages', false);
             } else {
-              setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
-              setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
+              record = await setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
+              record = await setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
             }
   
-            record =await updateRecord(record);
-            setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
+            record = await updateRecord(record);
           }
   
           // Save parsing progress in context state
@@ -972,20 +971,24 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         }
       }  
       
-      const removeRecordExtra = async (record: Record, type: string) => {
+      const removeRecordExtra = async (record: Record, type: string, autosaveRecord: boolean = true) => {
         let recordEXTRA = record.extra || []
         recordEXTRA = recordEXTRA.filter(p => p.type !== type)
-        record = new Record({ ...record, extra: recordEXTRA });
-        await updateRecord(record);
+        record = new Record({ ...record, extra: recordEXTRA }) as Record;
+        if (autosaveRecord) {
+          return await updateRecord(record);
+        }
+        return record;
       }
 
-    const setRecordExtra = async (record: Record, type: string, value: string, autosaveRecord: boolean = true) => {
+    const setRecordExtra = async (record: Record, type: string, value: string, autosaveRecord: boolean = true): Promise<Record> => {
         let recordEXTRA = record.extra || []
         recordEXTRA.find(p => p.type === type) ? recordEXTRA = recordEXTRA.map(p => p.type === type ? { ...p, value } : p) : recordEXTRA.push({ type, value })
         record = new Record({ ...record, extra: recordEXTRA });
         if (autosaveRecord) {
-          await updateRecord(record);
+          return await updateRecord(record);
         }
+        return record;
     }
 
     const translateRecord = async (record: Record, language: string = 'English') => {

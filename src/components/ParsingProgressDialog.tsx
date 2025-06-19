@@ -2,6 +2,8 @@ import { useContext, useEffect, useRef } from 'react';
 import { RecordContext } from '@/contexts/record-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import styles from '@/app/content/[pageName]/page.module.css';
 
 export default function ParsingProgressDialog() {
   const recordContext = useContext(RecordContext);
@@ -46,8 +48,15 @@ export default function ParsingProgressDialog() {
             <div className="mb-2 text-xs text-zinc-400">
               Last updated: {parsingProgress.history.length > 0 ? new Date(parsingProgress.history[parsingProgress.history.length-1].timestamp).toLocaleString() : '-'}
             </div>
-            <div ref={scrollRef} className="mb-2 text-xs bg-zinc-100 dark:bg-zinc-900 p-2 rounded max-h-64 overflow-y-auto prose prose-xs max-w-none">
-              <Markdown>{parsingProgress.textDelta || '*No streaming text yet*'}</Markdown>
+            <div ref={scrollRef} className="mb-2 text-xs bg-zinc-100 dark:bg-zinc-900 p-2 rounded max-h-64 overflow-y-auto">
+              <Markdown
+                className={styles.markdown}
+                remarkPlugins={[remarkGfm]}
+              >{
+                (parsingProgress.textDelta
+                  ? parsingProgress.textDelta.replace(/```(markdown|text)?\n?|```/g, '')
+                  : '*No streaming text yet*')
+              }</Markdown>
             </div>
           </>
         ) : (

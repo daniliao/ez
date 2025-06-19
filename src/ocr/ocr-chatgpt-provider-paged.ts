@@ -74,6 +74,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             let metaDataJson = '';
             for await (const delta of metadataStream) {
                 metaDataJson += delta;
+                record = await updateParseProgress(record as Record, true, 0, 0, null, null);
             }
 
             metaDataJson = metaDataJson.replace(/```[a-zA-Z]*\n?|```/g, '');

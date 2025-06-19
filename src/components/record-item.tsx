@@ -242,6 +242,16 @@ useEffect(() => {
           <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
             Record saved succesfully, processing in progress...
           </div>
+          {record.parseProgress && (
+            <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
+              Parse progress: {record.parseProgress.page} / {record.parseProgress.total}
+              {record.parseProgress.textDelta && (
+                <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
+                  Text delta: {record.parseProgress.textDelta}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
             {record.attachments.map((attachment, index) => (

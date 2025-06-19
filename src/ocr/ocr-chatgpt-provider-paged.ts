@@ -3,7 +3,7 @@ import { findCodeBlocks } from "@/lib/utils";
 import { AIResultEventType, ChatContextType, MessageType, MessageVisibility } from '@/contexts/chat-context';
 import { ConfigContextType } from '@/contexts/config-context';
 import { FolderContextType } from '@/contexts/folder-context';
-import { RecordContextType } from '@/contexts/record-context';
+import { getRecordExtra } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
@@ -11,14 +11,17 @@ export async function parse(record: Record, chatContext: ChatContextType, config
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
 
+    const parseProgress = parseInt(await getRecordExtra(record, 'Document parsed pages') as string || '0');
+
     return new Promise(async (resolve, reject) => {
         try {
             // Prepare the prompt
 
-            let page = 1;
+            let page = parseProgress + 1;
             let recordText = '';
-            for (const image of sourceImages) {
-                const prompt = prompts.recordParseSinglePage({ record, config: configContext, page}); // TODO: add transcription if exists
+            for (const image of sourceImages.slice(parseProgress)) {
+                let pageText = '';
+                const prompt = prompts.recordParseSinglePage({ record, config: configContext, page }); // TODO: add transcription if exists
 
                 const stream = chatContext.aiDirectCallStream([
                     {
@@ -33,11 +36,13 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                 }, parseAIProvider, parseModelName);
                 // parsing page by page
 
-                for await (const delta of stream) {
+                for await (const delta of stream) { 
                     recordText += delta;
+                    pageText += delta;
+                    await updateParseProgress(record, false, page, sourceImages.length, { textDelta: delta }, null);
                 }
 
-                await updateParseProgress(record, false, page, sourceImages.length, null, null);
+                await updateParseProgress(record, false, page, sourceImages.length, { pageDelta: pageText }, null);
 
                 page++;
             }

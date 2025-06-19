@@ -199,12 +199,9 @@ export class Record {
       this.text = recordSource.text ? recordSource.text : '';
       this.checksum = recordSource.checksum ? recordSource.checksum : '';
       this.checksumLastParsed = recordSource.checksumLastParsed ? recordSource.checksumLastParsed : '';
+      this.parseInProgress = recordSource.parseInProgress ? recordSource.parseInProgress : false;
 
-      if (recordSource instanceof Record) {
-        this.parseInProgress = recordSource.parseInProgress ? recordSource.parseInProgress : false;
-        this.parseError = recordSource.parseError ? recordSource.parseError : null;
-      }
-
+      
     if(recordSource instanceof Record) {
         this.tags = recordSource.tags
      } else {

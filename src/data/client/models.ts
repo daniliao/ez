@@ -163,6 +163,7 @@ export type ParseProgress = {
     total: number;
     textDelta?: string;
     pageDelta?: string;
+    recordText?: string;
 }
 export class Record {
     id?: number;

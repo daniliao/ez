@@ -25,7 +25,7 @@ function recordDescriptionPrompt(context: PromptContext) {
     return `<summary-field>Please fill the "summary" field of the record based on these rules:
         0. Summary should be ALLWAYS IN ENGLISH.
         1. Create a table with the following columns: page number, summary, types of data, importance
-        2. From the record text put into table actual page numbers, one sentece summary of the page content, types of medical record included on this page, overal importance (1-10 (higher is more important)) for the medical case descibed in the document
+        2. From the record text put into table actual page numbers, one sentece summary of the page content, full english nice names of the types of medical record included on this page, overal importance (1-10 (higher is more important)) for the medical case descibed in the document
         3. Put the page numbers in table in this format: Page X
     </summary-field>`;
 }

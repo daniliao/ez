@@ -69,6 +69,7 @@ const discoverEventDate = (record: Record): string => {
 };
 
 
+
 export const getRecordExtra = async (record: Record, type: string) => {
   return record.extra?.find(p => p.type === type)?.value;
 }
@@ -134,6 +135,7 @@ export type RecordContextType = {
     exportRecords: () => void;
     importRecords: (zipFileInput: ArrayBuffer) => void;
     setRecordExtra: (record: Record, type: string, value: string) => Promise<void>;
+    removeRecordExtra: (record: Record, type: string) => Promise<void>;
     translateRecord: (record: Record, language?: string) => Promise<Record>;
     parsingProgressByRecordId: {
       [recordId: string]: {
@@ -652,8 +654,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           if (metadata && metadata.pageDelta && metadata.recordText) {
             record.text = metadata.recordText;
             setRecordExtra(record, 'Page ' + progress.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
-            setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
-            setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
+
+            if (progress === progressOf) {
+              removeRecordExtra(record, 'Document parsed pages');
+            } else {
+              setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
+              setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
+            }
   
             await updateRecord(record);
             setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
@@ -953,7 +960,14 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             }
           });
         }
-      }    
+      }  
+      
+      const removeRecordExtra = async (record: Record, type: string) => {
+        let recordEXTRA = record.extra || []
+        recordEXTRA = recordEXTRA.filter(p => p.type !== type)
+        record = new Record({ ...record, extra: recordEXTRA });
+        await updateRecord(record);
+      }
 
     const setRecordExtra = async (record: Record, type: string, value: string, autosaveRecord: boolean = true) => {
         let recordEXTRA = record.extra || []
@@ -1068,6 +1082,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                  recordDialogOpen,
                  setRecordDialogOpen,
                  setRecordExtra,
+                 removeRecordExtra,
                  translateRecord,
                  parsingProgressByRecordId
                 }}

@@ -639,7 +639,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           })
       }
     
-      const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, metadata: any = null, error: any = null) => {
+      const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, metadata: any = null, error: any = null) : Promise<Record> => {
 
 
         if(inProgress !== record.parseInProgress || error !== record.parseError) {
@@ -670,7 +670,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
             }
   
-            await updateRecord(record);
+            record =await updateRecord(record);
             setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
           }
   
@@ -684,7 +684,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 progress,
                 progressOf,
                 metadata,
-                textDelta: metadata?.textDelta || '',
+                textDelta: (prev[id]?.textDelta || '') + (metadata?.textDelta || ''),
                 pageDelta: metadata?.pageDelta || '',
                 recordText: metadata?.recordText || '',
                 history: [
@@ -695,12 +695,14 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             };
           });
         }
+
+        return record;
       }
 
       const processParseQueue = async () => {
         if (parseQueueInProgress) {
           for(const pr of parseQueue) {
-            updateParseProgress(pr, true);
+            await updateParseProgress(pr, true);
           }
           console.log('Parse queue in progress');
           return;
@@ -712,7 +714,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           try {
             currentRecord = parseQueue[0] as Record;
             console.log('Processing record: ', currentRecord, parseQueue.length);
-            updateParseProgress(currentRecord, true);
+            await updateParseProgress(currentRecord, true);
             
             setOperationStatus(DataLoadingStatus.Loading);
             const attachments = await convertAttachmentsToImages(currentRecord);

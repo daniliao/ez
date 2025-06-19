@@ -144,9 +144,14 @@ export type RecordContextType = {
         metadata: any;
         textDelta: string;
         pageDelta: string;
-        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; timestamp: number }[];
+        recordText?: string;
+        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
       }
     };
+    parsingDialogOpen: boolean;
+    setParsingDialogOpen: (open: boolean) => void;
+    parsingDialogRecordId: string | null;
+    setParsingDialogRecordId: (id: string | null) => void;
 }
 
 export const RecordContext = createContext<RecordContextType | null>(null);
@@ -170,9 +175,12 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         metadata: any;
         textDelta: string;
         pageDelta: string;
-        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; timestamp: number }[];
+        recordText?: string;
+        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
       }
     }>({});
+    const [parsingDialogOpen, setParsingDialogOpen] = useState(false);
+    const [parsingDialogRecordId, setParsingDialogRecordId] = useState<string | null>(null);
     
     
     useEffect(() => { // filter records when tags change
@@ -1084,7 +1092,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                  setRecordExtra,
                  removeRecordExtra,
                  translateRecord,
-                 parsingProgressByRecordId
+                 parsingProgressByRecordId,
+                 parsingDialogOpen,
+                 setParsingDialogOpen,
+                 parsingDialogRecordId,
+                 setParsingDialogRecordId
                 }}
         >
             {children}

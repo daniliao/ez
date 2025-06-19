@@ -285,7 +285,13 @@ useEffect(() => {
 
           <div className="text-sm text-zinc-500 dark:text-zinc-400 text-left font-medium flex justify-center mt-2 pr-3">
             For all cool AI features, we need to OCR and parse record data first. Records in queue: {recordContext?.parseQueueLength}. Do not close the browser window. Parsing record in progress... <DataLoader />
-            <Button className="ml-2" onClick={() => setProgressDialogOpen(true)}>
+            <Button
+              className="ml-2"
+              onClick={() => {
+                recordContext?.setParsingDialogRecordId(record.id?.toString() || 'unknown');
+                recordContext?.setParsingDialogOpen(true);
+              }}
+            >
               Check progress...
             </Button>
           </div>
@@ -584,33 +590,6 @@ useEffect(() => {
             </Button>
           ) : null}      
         </div>
-        <Dialog open={progressDialogOpen} onOpenChange={setProgressDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Parsing Progress</DialogTitle>
-            </DialogHeader>
-            {parsingProgress ? (
-              <>
-                <div className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">
-                  Page: {parsingProgress.progress} / {parsingProgress.progressOf}
-                </div>
-                <div className="mb-2 text-xs text-zinc-400">
-                  Last updated: {parsingProgress.history.length > 0 ? new Date(parsingProgress.history[parsingProgress.history.length-1].timestamp).toLocaleString() : '-'}
-                </div>
-                <Markdown className="prose prose-sm max-w-none">
-                  {parsingProgress.pageDelta || '*No page text yet*'}
-                </Markdown>
-                {parsingProgress.metadata && (
-                  <pre className="mt-2 bg-zinc-100 dark:bg-zinc-800 p-2 rounded text-xs overflow-x-auto">
-                    {JSON.stringify(parsingProgress.metadata, null, 2)}
-                  </pre>
-                )}
-              </>
-            ) : (
-              <div className="text-sm text-zinc-400">No parsing progress yet.</div>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     )
   );

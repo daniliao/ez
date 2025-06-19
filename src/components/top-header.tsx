@@ -29,6 +29,7 @@ import { SaaSContext } from "@/contexts/saas-context";
 import FeedbackWidget from "./feedback-widget";
 import { SaaSContextLoader } from "./saas-context-loader";
 import TranslationBenchmarkPopup from "./translation-benchmark-popup";
+import ParsingProgressDialog from '@/components/ParsingProgressDialog';
 
 export default function TopHeader() {
     const folderContext = useContext(FolderContext);
@@ -132,6 +133,7 @@ export default function TopHeader() {
             
         </div>
         <TranslationBenchmarkPopup open={translationBenchmarkOpen} setOpen={setTranslationBenchmarkOpen} />
+        <ParsingProgressDialog />
       </div>
     );
 }

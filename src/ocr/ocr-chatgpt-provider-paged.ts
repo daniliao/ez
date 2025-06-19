@@ -66,10 +66,12 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             metaDataJson = metaDataJson.replace(/```[a-zA-Z]*\n?|```/g, '');
 
             const fullTextToProcess = '```json\n' + metaDataJson + '\n```\n\r\n\r' + '```markdown\n' + recordText + '\n```';
-            const updatedRecord = await updateRecordFromText(fullTextToProcess, record, false);
-
-
             await record.updateChecksumLastParsed();
+
+            const updatedRecord = await updateRecordFromText(fullTextToProcess, record, false);
+            await updateParseProgress(record, false, page, sourceImages.length, null, null);
+
+
 
             if (updatedRecord) {
                 resolve(updatedRecord);

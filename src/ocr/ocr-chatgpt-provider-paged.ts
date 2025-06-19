@@ -65,7 +65,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
 
             metaDataJson = metaDataJson.replace(/```[a-zA-Z]*\n?|```/g, '');
 
-            const fullTextToProcess = '```json\n' + metaDataJson + '\n```' + '```markdown\n' + recordText + '\n```';
+            const fullTextToProcess = '```json\n' + metaDataJson + '\n```\n\r\n\r' + '```markdown\n' + recordText + '\n```';
             const updatedRecord = await updateRecordFromText(fullTextToProcess, record, false);
 
 

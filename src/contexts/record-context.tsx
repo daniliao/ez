@@ -37,6 +37,12 @@ import { parse as chatgptPagedParseRecord } from '@/ocr/ocr-chatgpt-provider-pag
 
 // Add the helper function before the parseQueueInProgress variable
 const discoverEventDate = (record: Record): string => {
+
+  // Check if eventDate is NaN and use createdAt as fallback
+  if (record.eventDate && isNaN(Date.parse(record.eventDate))) {
+    return record.createdAt;
+  }
+
   if (record.eventDate) {
     return record.eventDate;
   }

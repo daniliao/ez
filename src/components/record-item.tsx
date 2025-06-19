@@ -128,7 +128,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
     };*/
   }, [])
 
-  useEffect(() => {
+useEffect(() => {
 
     if (isVisible) {      
       loadAttachmentPreviews();

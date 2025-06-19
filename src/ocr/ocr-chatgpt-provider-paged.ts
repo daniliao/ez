@@ -7,7 +7,7 @@ import { RecordContextType } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record> {
+export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => Promise<void>, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
 
@@ -16,60 +16,44 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             // Prepare the prompt
 
             let page = 1;
+            let recordText = '';
             for (const image of sourceImages) {
                 const prompt = prompts.recordParseSinglePage({ record, config: configContext, page}); // TODO: add transcription if exists
 
-                chatContext.aiDirectCall([
+                const stream = chatContext.aiDirectCallStream([
                     {
                         id: 'page-' + page,
                         role: 'user',
                         content: prompt,
                         type: MessageType.Parse,
-                        visibility: MessageVisibility.Private,
                         createdAt: new Date(),
                         experimental_attachments: [image]                         
                     }
-                ]
+                ], async (resultMessage, result) => {
+                }, parseAIProvider, parseModelName);
                 // parsing page by page
+
+                for await (const delta of stream) {
+                    recordText += delta;
+                }
+
+                await updateParseProgress(record, false, page, sourceImages.length, null, null);
 
                 page++;
             }
+            await record.updateChecksumLastParsed();
 
 
-            // Send to chat context with images
-            chatContext.sendMessage({
-                message: {
-                    role: 'user',
-                    createdAt: new Date(),
-                    type: MessageType.Parse,
-                    content: prompt,
-                    experimental_attachments: sourceImages
-                },
-                onResult: async (resultMessage, result) => {
-                    if (result.finishReason !== 'error') {
-                        if (result.finishReason === 'length') {
-                            toast.error('Too many findings for one record. Try uploading attachments one per record')
-                        }
+            const updatedRecord = await updateRecordFromText(recordText, record, false);
+            if (updatedRecord) {
+                resolve(updatedRecord);
+            } else {
+                reject(new Error('Failed to update record'));
+            }
 
-                        resultMessage.recordRef = record;
-                        updateParseProgress(record, false, null);
-                        resultMessage.recordSaved = true;
-                        await record.updateChecksumLastParsed();
-                        const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);
-                        if (updatedRecord) {
-                            resolve(updatedRecord);
-                        } else {
-                            reject(new Error('Failed to update record'));
-                        }
-                    } else {
-                        reject(result);
-                    }
-                },
-                providerName: parseAIProvider,
-                modelName: parseModelName
-            });
+
         } catch (error) {
-            console.error('Error in Gemini OCR:', error);
+            console.error('Error in ChatGPT paged OCR:', error);
             reject(error);
         }
     });

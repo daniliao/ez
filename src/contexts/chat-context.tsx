@@ -131,7 +131,7 @@ export type ChatContextType = {
     setAgentContext: (value: AgentContext) => void;
     setRecordsLoaded: (value: boolean) => void;
     aiDirectCall: (messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) => void;
-    aiDirectCallStream: (messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) => void;
+    aiDirectCallStream: (messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) => AsyncGenerator<string>;
     sendMessage: (msg: CreateMessageEnvelope, includeExistingMessagesAsContext?: boolean) => void;
     sendMessages: (msg: CreateMessagesEnvelope, includeExistingMessagesAsContext?: boolean) => void;
     autoCheck: (messages: MessageEx[], providerName?: string, modelName?: string) => void;
@@ -374,7 +374,7 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
     }
 
     /** make the auto check call to a different model */
-    async function* aiDirectCallStream(messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) {
+    async function* aiDirectCallStream(messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string): AsyncGenerator<string> {
         try {
             let messagesToSend = messages;
             const resultMessage: MessageEx = {

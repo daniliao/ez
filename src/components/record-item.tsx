@@ -145,7 +145,8 @@ useEffect(() => {
           console.log('Auto-translate enabled, setting up callback');
           recordContext?.parseRecord(record, async (parsedRecord) => {
              setIsTranslating(true); 
-             recordContext?.translateRecord(parsedRecord);
+             await recordContext?.translateRecord(parsedRecord);
+             setIsTranslating(false);
           });
         } else {
           console.log('Auto-translate disabled');

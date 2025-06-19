@@ -198,9 +198,9 @@ export class Record {
       this.transcription = recordSource.transcription ? recordSource.transcription : '';
       this.text = recordSource.text ? recordSource.text : '';
       this.checksum = recordSource.checksum ? recordSource.checksum : '';
+      this.checksumLastParsed = recordSource.checksumLastParsed ? recordSource.checksumLastParsed : '';
 
       if (recordSource instanceof Record) {
-        this.checksumLastParsed = recordSource.checksumLastParsed ? recordSource.checksumLastParsed : '';
         this.parseInProgress = recordSource.parseInProgress ? recordSource.parseInProgress : false;
         this.parseError = recordSource.parseError ? recordSource.parseError : null;
       }

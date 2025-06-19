@@ -77,6 +77,8 @@ let parseQueueInProgress = false;
 let parseQueue:Record[] = []
 let parseQueueLength = 0;
 
+// Parsing progress state: recordId -> { progress, progressOf, metadata, textDelta, pageDelta, history: [] }
+// We'll use a React state for this, so move it into the provider below.
 
 export type FilterTag = {
   tag: string; 
@@ -133,6 +135,16 @@ export type RecordContextType = {
     importRecords: (zipFileInput: ArrayBuffer) => void;
     setRecordExtra: (record: Record, type: string, value: string) => Promise<void>;
     translateRecord: (record: Record, language?: string) => Promise<Record>;
+    parsingProgressByRecordId: {
+      [recordId: string]: {
+        progress: number;
+        progressOf: number;
+        metadata: any;
+        textDelta: string;
+        pageDelta: string;
+        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; timestamp: number }[];
+      }
+    };
 }
 
 export const RecordContext = createContext<RecordContextType | null>(null);
@@ -149,6 +161,16 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     const [filterSelectedTags, setFilterSelectedTags] = useState<string[]>([]);
     const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
     const [sortBy, setSortBy] = useState<string>('eventDate desc');
+    const [parsingProgressByRecordId, setParsingProgressByRecordId] = useState<{
+      [recordId: string]: {
+        progress: number;
+        progressOf: number;
+        metadata: any;
+        textDelta: string;
+        pageDelta: string;
+        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; timestamp: number }[];
+      }
+    }>({});
     
     
     useEffect(() => { // filter records when tags change
@@ -623,11 +645,12 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             page: progress,
             total: progressOf,
             textDelta: metadata?.textDelta,
-            pageDelta: metadata?.pageDelta
+            pageDelta: metadata?.pageDelta,
+            recordText: metadata?.recordText
           }
 
-          if (metadata && metadata.pageDelta) {
-            record.text = record.text + metadata.pageDelta
+          if (metadata && metadata.pageDelta && metadata.recordText) {
+            record.text = metadata.recordText;
             setRecordExtra(record, 'Page ' + progress.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
             setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
             setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
@@ -636,6 +659,26 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
           }
   
+          // Save parsing progress in context state
+          setParsingProgressByRecordId(prev => {
+            const id = record.id?.toString() || 'unknown';
+            const prevHistory = prev[id]?.history || [];
+            return {
+              ...prev,
+              [id]: {
+                progress,
+                progressOf,
+                metadata,
+                textDelta: metadata?.textDelta || '',
+                pageDelta: metadata?.pageDelta || '',
+                recordText: metadata?.recordText || '',
+                history: [
+                  ...prevHistory,
+                  { progress, progressOf, metadata, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
+                ]
+              }
+            };
+          });
         }
       }
 
@@ -1025,7 +1068,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                  recordDialogOpen,
                  setRecordDialogOpen,
                  setRecordExtra,
-                 translateRecord
+                 translateRecord,
+                 parsingProgressByRecordId
                 }}
         >
             {children}

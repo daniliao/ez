@@ -23,6 +23,7 @@ import ZoomableImage from './zoomable-image';
 import { convertRecordIdsToLinks } from '@/lib/utils';
 import showdown from 'showdown';
 import { Accordion, AccordionTrigger, AccordionContent, AccordionItem } from "./ui/accordion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 
 //import RecordItemJson from "@/components/record-item-json";
 //import RecordItemExtra from '@/components/record-item-extra';
@@ -78,8 +79,10 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const [activeTab, setActiveTab] = useState('text');
   const [textAccordionValue, setTextAccordionValue] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
 
   const [displayableAttachments, setDisplayableAttachments] = useState<DisplayableDataObject[]>([]);
+  const parsingProgress = recordContext?.parsingProgressByRecordId[record.id?.toString() || 'unknown'];
 
   const loadAttachmentPreviews = async () => {
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
@@ -282,10 +285,9 @@ useEffect(() => {
 
           <div className="text-sm text-zinc-500 dark:text-zinc-400 text-left font-medium flex justify-center mt-2 pr-3">
             For all cool AI features, we need to OCR and parse record data first. Records in queue: {recordContext?.parseQueueLength}. Do not close the browser window. Parsing record in progress... <DataLoader />
-            <Button className="ml-2" onClick={
-              () => {
-              }
-            }>Check progress...</Button>
+            <Button className="ml-2" onClick={() => setProgressDialogOpen(true)}>
+              Check progress...
+            </Button>
           </div>
 
         </div>
@@ -582,6 +584,33 @@ useEffect(() => {
             </Button>
           ) : null}      
         </div>
+        <Dialog open={progressDialogOpen} onOpenChange={setProgressDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Parsing Progress</DialogTitle>
+            </DialogHeader>
+            {parsingProgress ? (
+              <>
+                <div className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  Page: {parsingProgress.progress} / {parsingProgress.progressOf}
+                </div>
+                <div className="mb-2 text-xs text-zinc-400">
+                  Last updated: {parsingProgress.history.length > 0 ? new Date(parsingProgress.history[parsingProgress.history.length-1].timestamp).toLocaleString() : '-'}
+                </div>
+                <Markdown className="prose prose-sm max-w-none">
+                  {parsingProgress.pageDelta || '*No page text yet*'}
+                </Markdown>
+                {parsingProgress.metadata && (
+                  <pre className="mt-2 bg-zinc-100 dark:bg-zinc-800 p-2 rounded text-xs overflow-x-auto">
+                    {JSON.stringify(parsingProgress.metadata, null, 2)}
+                  </pre>
+                )}
+              </>
+            ) : (
+              <div className="text-sm text-zinc-400">No parsing progress yet.</div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     )
   );

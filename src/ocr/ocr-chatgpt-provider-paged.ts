@@ -37,13 +37,13 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                 // parsing page by page
 
                 for await (const delta of stream) { 
-                    recordText += delta;
                     pageText += delta;
                     await updateParseProgress(record, true, page, sourceImages.length, { textDelta: delta }, null);
                 }
 
                 // Clean up pageText before saving
                 pageText = pageText.replace(/```[a-zA-Z]*\n?|```/g, '');
+                recordText += pageText;
 
                 await updateParseProgress(record, true, page, sourceImages.length, { pageDelta: pageText }, null);
 

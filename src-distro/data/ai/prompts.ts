@@ -43,6 +43,15 @@ export const prompts = {
                 Please format the response in markdown.`;
     },
 
+    recordParseSinglePage: (context: PromptContext) => {
+        return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, please convert it to the markdown text exactly as it is in the original document. \
+                If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. \
+                Use markdown to make a nice format of the document - as close as possible to the original document. \
+                Return only markdown text of this document with no additions, comments, no intros no other answers. Just exact text. \
+                Resulting document should be in the same language as the original document. \
+                Do not add any terms or words that are not in the text. \
+                attachments to text. One attachment is a one page of the record. Include page numbers in markdown.  Please use markdown to format it nicely and return after JSON object'
+    }, 
     recordParseMultimodal: (context: PromptContext) => {
         return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, please parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
                 First: JSON should be all in original language. \

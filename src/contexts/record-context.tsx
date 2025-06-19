@@ -672,7 +672,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       }      
     
       const parseRecord = async (newRecord: Record, postParseCallback?: PostParseCallback)=> {
-        await chatContext.newChat(); // reset chat context TODO: move parsing out of the chat process
         if (!parseQueue.find(pr => pr.id === newRecord.id) && (newRecord.attachments.length > 0 || newRecord.transcription)) {
           if (postParseCallback) {
             newRecord.postParseCallback = postParseCallback;

@@ -7,42 +7,58 @@ import { RecordContextType } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>,  updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record> {
+export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
 
-    return new Promise ((resolve, reject) => {
-        chatContext.sendMessage({
-            message: {
-                role: 'user',
-                // visibility: MessageVisibility.ProgressWhileStreaming,
-                createdAt: new Date(),
-                type: MessageType.Parse,
-                content: record.transcription ? prompts.recordParseMultimodalTranscription({ record, config: configContext }) :  prompts.recordParseMultimodal({ record, config: configContext }),
-                experimental_attachments: sourceImages
-            },
-            onResult: async (resultMessage, result) => {
-                if (result.finishReason !== 'error') {
-                    if (result.finishReason === 'length') {
-                        toast.error('Too many findings for one record. Try uploading attachments one per record')
-                    }
+    return new Promise(async (resolve, reject) => {
+        try {
+            // Prepare the prompt
+            const prompt = prompts.recordParseSinglePage({ record, config: configContext }); // TODO: add transcription if exists
 
-                    resultMessage.recordRef = record;
-                    updateParseProgress(record, false, null);
-                    resultMessage.recordSaved = true;
-                    await record.updateChecksumLastParsed();
-                    const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);
-                    if (updatedRecord) {
-                        resolve(updatedRecord);
+            let page = 1;
+            for (const image of sourceImages) {
+                // parsing page by page
+
+                page++;
+            }
+
+
+            // Send to chat context with images
+            chatContext.sendMessage({
+                message: {
+                    role: 'user',
+                    createdAt: new Date(),
+                    type: MessageType.Parse,
+                    content: prompt,
+                    experimental_attachments: sourceImages
+                },
+                onResult: async (resultMessage, result) => {
+                    if (result.finishReason !== 'error') {
+                        if (result.finishReason === 'length') {
+                            toast.error('Too many findings for one record. Try uploading attachments one per record')
+                        }
+
+                        resultMessage.recordRef = record;
+                        updateParseProgress(record, false, null);
+                        resultMessage.recordSaved = true;
+                        await record.updateChecksumLastParsed();
+                        const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);
+                        if (updatedRecord) {
+                            resolve(updatedRecord);
+                        } else {
+                            reject(new Error('Failed to update record'));
+                        }
                     } else {
-                        reject(new Error('Failed to update record'));
+                        reject(result);
                     }
-                } else {
-                    reject(result);
-                }
-            },
-            providerName: parseAIProvider,
-            modelName: parseModelName
-        });
+                },
+                providerName: parseAIProvider,
+                modelName: parseModelName
+            });
+        } catch (error) {
+            console.error('Error in Gemini OCR:', error);
+            reject(error);
+        }
     });
-}    
+} 

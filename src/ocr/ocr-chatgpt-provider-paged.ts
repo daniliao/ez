@@ -39,10 +39,12 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                 for await (const delta of stream) { 
                     recordText += delta;
                     pageText += delta;
-                    await updateParseProgress(record, false, page, sourceImages.length, { textDelta: delta }, null);
+                    await updateParseProgress(record, true, page, sourceImages.length, { textDelta: delta }, null);
                 }
 
-                await updateParseProgress(record, false, page, sourceImages.length, { pageDelta: pageText }, null);
+                
+
+                await updateParseProgress(record, true, page, sourceImages.length, { pageDelta: pageText }, null);
 
                 page++;
             }

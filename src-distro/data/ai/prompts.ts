@@ -50,8 +50,7 @@ export const prompts = {
     },
 
     recordParseSinglePage: (context: ParseSinglePagePromptContext) => {
-        return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. \
-                This is the page number: ' + context.page + '. Include the page number as a first line of the text: Page ' + context.page + ' \
+        return 'This is the page number: ' + context.page + '. Include the page number as a first line of the text: Page ' + context.page + ' \
                 If valid health data, please convert it to the markdown text exactly as it is in the original document. \
                 If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. \
                 Use markdown to make a nice format of the document - as close as possible to the original document. \

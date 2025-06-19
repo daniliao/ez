@@ -609,8 +609,14 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     
       const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, metadata: any = null, error: any = null) => {
 
-        record.parseError = error;
-        record.parseInProgress = inProgress;
+
+        if(inProgress !== record.parseInProgress || error !== record.parseError) {
+          record.parseInProgress = inProgress;
+          record.parseError = error;
+
+          setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
+        }
+
         if (progress > 0 && progressOf > 0) {
 
           record.parseProgress = {
@@ -622,14 +628,14 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
           if (metadata && metadata.pageDelta) {
             record.text = record.text + metadata.pageDelta
+            setRecordExtra(record, 'Document parsed pages', progress.toString()); // update the record parse progress
+            setRecordExtra(record, 'Document pages total', progressOf.toString()); // update the record parse progress
+  
+            await updateRecord(record);
+            setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
           }
   
-          setRecordExtra(record, 'Document parsed pages', progress.toString()); // update the record parse progress
-          setRecordExtra(record, 'Document pages total', progressOf.toString()); // update the record parse progress
-
-          await updateRecord(record);
         }
-        setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
       }
 
       const processParseQueue = async () => {

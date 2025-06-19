@@ -628,6 +628,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
           if (metadata && metadata.pageDelta) {
             record.text = record.text + metadata.pageDelta
+            setRecordExtra(record, 'Page ' + progress.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
             setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
             setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
   

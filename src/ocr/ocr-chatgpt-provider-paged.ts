@@ -43,11 +43,14 @@ export async function parse(record: Record, chatContext: ChatContextType, config
 
                 // Clean up pageText before saving
                 pageText = pageText.replace(/```[a-zA-Z]*\n?|```/g, '');
-                recordText += pageText;
-
                 await updateParseProgress(record, true, page, sourceImages.length, { pageDelta: pageText }, null);
 
                 page++;
+            }
+
+            for (let pageAcc = 1; pageAcc <= sourceImages.length; pageAcc++) {
+                const pageText = await getRecordExtra(record, 'Page ' + pageAcc + ' content') as string; /// accumulate the page content - as we're saving it page by page
+                recordText += pageText;
             }
 
             const metadataStream = chatContext.aiDirectCallStream([

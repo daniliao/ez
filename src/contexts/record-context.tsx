@@ -33,6 +33,7 @@ import { diff, addedDiff, deletedDiff, updatedDiff, detailedDiff } from 'deep-ob
 import { AuditContext } from './audit-context';
 import { SaaSContext } from './saas-context';
 import { nanoid } from 'nanoid';
+import { parse as chatgptPagedParseRecord } from '@/ocr/ocr-chatgpt-provider-paged';
 
 // Add the helper function before the parseQueueInProgress variable
 const discoverEventDate = (record: Record): string => {
@@ -640,6 +641,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 updatedRecord = await tesseractParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
               } else if (ocrProvider === 'gemini') {
                 updatedRecord = await geminiParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+              } else if (ocrProvider === 'chatgpt-paged') {
+                updatedRecord = await chatgptPagedParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+              } else {
+                toast.error('Unknown OCR provider: ' + ocrProvider);
+                updatedRecord = null;
               }
 
               // Execute post-parse callback if exists

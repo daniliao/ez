@@ -33,6 +33,7 @@ import { diff, addedDiff, deletedDiff, updatedDiff, detailedDiff } from 'deep-ob
 import { AuditContext } from './audit-context';
 import { SaaSContext } from './saas-context';
 import { nanoid } from 'nanoid';
+import { parse as chatgptPagedParseRecord } from '@/ocr/ocr-chatgpt-provider-paged';
 
 // Add the helper function before the parseQueueInProgress variable
 const discoverEventDate = (record: Record): string => {
@@ -67,10 +68,18 @@ const discoverEventDate = (record: Record): string => {
   return record.createdAt;
 };
 
+
+
+export const getRecordExtra = async (record: Record, type: string) => {
+  return record.extra?.find(p => p.type === type)?.value;
+}
+
 let parseQueueInProgress = false;
 let parseQueue:Record[] = []
 let parseQueueLength = 0;
 
+// Parsing progress state: recordId -> { progress, progressOf, metadata, textDelta, pageDelta, history: [] }
+// We'll use a React state for this, so move it into the provider below.
 
 export type FilterTag = {
   tag: string; 
@@ -125,8 +134,24 @@ export type RecordContextType = {
 
     exportRecords: () => void;
     importRecords: (zipFileInput: ArrayBuffer) => void;
-    setRecordExtra: (record: Record, type: string, value: string) => Promise<void>;
+    setRecordExtra: (record: Record, type: string, value: string) => Promise<Record>;
+    removeRecordExtra: (record: Record, type: string) => Promise<void>;
     translateRecord: (record: Record, language?: string) => Promise<Record>;
+    parsingProgressByRecordId: {
+      [recordId: string]: {
+        progress: number;
+        progressOf: number;
+        metadata: any;
+        textDelta: string;
+        pageDelta: string;
+        recordText?: string;
+        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
+      }
+    };
+    parsingDialogOpen: boolean;
+    setParsingDialogOpen: (open: boolean) => void;
+    parsingDialogRecordId: string | null;
+    setParsingDialogRecordId: (id: string | null) => void;
 }
 
 export const RecordContext = createContext<RecordContextType | null>(null);
@@ -143,6 +168,19 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     const [filterSelectedTags, setFilterSelectedTags] = useState<string[]>([]);
     const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
     const [sortBy, setSortBy] = useState<string>('eventDate desc');
+    const [parsingProgressByRecordId, setParsingProgressByRecordId] = useState<{
+      [recordId: string]: {
+        progress: number;
+        progressOf: number;
+        metadata: any;
+        textDelta: string;
+        pageDelta: string;
+        recordText?: string;
+        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
+      }
+    }>({});
+    const [parsingDialogOpen, setParsingDialogOpen] = useState(false);
+    const [parsingDialogRecordId, setParsingDialogRecordId] = useState<string | null>(null);
     
     
     useEffect(() => { // filter records when tags change
@@ -601,16 +639,69 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           })
       }
     
-      const updateParseProgress = (record: Record, inProgress: boolean, error: any = null) => {
-        record.parseError = error;
+      const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, metadata: any = null, error: any = null) : Promise<Record> => {
+
+
         record.parseInProgress = inProgress;
-        setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
+        record.parseError = error;
+
+        if(inProgress !== record.parseInProgress || error !== record.parseError) {
+          setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
+        }
+
+        if (progress > 0 && progressOf > 0) {
+
+          record.parseProgress = {
+            page: progress,
+            total: progressOf,
+            textDelta: metadata?.textDelta,
+            pageDelta: metadata?.pageDelta,
+            recordText: metadata?.recordText
+          }
+
+          if (metadata && metadata.pageDelta && metadata.recordText) { // new page parsed
+            record.text = metadata.recordText;
+            record = await setRecordExtra(record, 'Page ' + progress.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
+
+            if (progress === (progressOf - 1)) {
+              removeRecordExtra(record, 'Document parsed pages', false);
+            } else {
+              record = await setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
+              record = await setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
+            }
+  
+            record = await updateRecord(record);
+          }
+  
+          // Save parsing progress in context state
+          setParsingProgressByRecordId(prev => {
+            const id = record.id?.toString() || 'unknown';
+            const prevHistory = prev[id]?.history || [];
+            return {
+              ...prev,
+              [id]: {
+                progress,
+                progressOf,
+                metadata,
+                textDelta: (prev[id]?.textDelta || '') + (metadata?.textDelta || ''),
+                pageDelta: metadata?.pageDelta || '',
+                recordText: metadata?.recordText || '',
+                history: [
+                  ...prevHistory,
+                  { progress, progressOf, metadata, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
+                ]
+              }
+            };
+          });
+        }
+
+        return record;
       }
 
       const processParseQueue = async () => {
         if (parseQueueInProgress) {
           for(const pr of parseQueue) {
-            updateParseProgress(pr, true);
+            await updateParseProgress(pr, true);
           }
           console.log('Parse queue in progress');
           return;
@@ -622,7 +713,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           try {
             currentRecord = parseQueue[0] as Record;
             console.log('Processing record: ', currentRecord, parseQueue.length);
-            updateParseProgress(currentRecord, true);
+            await updateParseProgress(currentRecord, true);
             
             setOperationStatus(DataLoadingStatus.Loading);
             const attachments = await convertAttachmentsToImages(currentRecord);
@@ -640,6 +731,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 updatedRecord = await tesseractParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
               } else if (ocrProvider === 'gemini') {
                 updatedRecord = await geminiParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+              } else if (ocrProvider === 'chatgpt-paged') {
+                updatedRecord = await chatgptPagedParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+              } else {
+                toast.error('Unknown OCR provider: ' + ocrProvider);
+                updatedRecord = null;
               }
 
               // Execute post-parse callback if exists
@@ -666,7 +762,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       }      
     
       const parseRecord = async (newRecord: Record, postParseCallback?: PostParseCallback)=> {
-        await chatContext.newChat(); // reset chat context TODO: move parsing out of the chat process
         if (!parseQueue.find(pr => pr.id === newRecord.id) && (newRecord.attachments.length > 0 || newRecord.transcription)) {
           if (postParseCallback) {
             newRecord.postParseCallback = postParseCallback;
@@ -874,13 +969,26 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             }
           });
         }
-      }    
+      }  
+      
+      const removeRecordExtra = async (record: Record, type: string, autosaveRecord: boolean = true) => {
+        let recordEXTRA = record.extra || []
+        recordEXTRA = recordEXTRA.filter(p => p.type !== type)
+        record = new Record({ ...record, extra: recordEXTRA }) as Record;
+        if (autosaveRecord) {
+          return await updateRecord(record);
+        }
+        return record;
+      }
 
-    const setRecordExtra = async (record: Record, type: string, value: string) => {
+    const setRecordExtra = async (record: Record, type: string, value: string, autosaveRecord: boolean = true): Promise<Record> => {
         let recordEXTRA = record.extra || []
         recordEXTRA.find(p => p.type === type) ? recordEXTRA = recordEXTRA.map(p => p.type === type ? { ...p, value } : p) : recordEXTRA.push({ type, value })
         record = new Record({ ...record, extra: recordEXTRA });
-        await updateRecord(record);
+        if (autosaveRecord) {
+          return await updateRecord(record);
+        }
+        return record;
     }
 
     const translateRecord = async (record: Record, language: string = 'English') => {
@@ -987,7 +1095,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                  recordDialogOpen,
                  setRecordDialogOpen,
                  setRecordExtra,
-                 translateRecord
+                 removeRecordExtra,
+                 translateRecord,
+                 parsingProgressByRecordId,
+                 parsingDialogOpen,
+                 setParsingDialogOpen,
+                 parsingDialogRecordId,
+                 setParsingDialogRecordId
                 }}
         >
             {children}

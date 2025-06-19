@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState, ReactNode } from "react";
-import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2, LanguagesIcon } from "lucide-react";
+import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2, LanguagesIcon, ImageIcon } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import Markdown from "react-markdown";
@@ -23,6 +23,7 @@ import ZoomableImage from './zoomable-image';
 import { convertRecordIdsToLinks } from '@/lib/utils';
 import showdown from 'showdown';
 import { Accordion, AccordionTrigger, AccordionContent, AccordionItem } from "./ui/accordion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 
 //import RecordItemJson from "@/components/record-item-json";
 //import RecordItemExtra from '@/components/record-item-extra';
@@ -78,8 +79,10 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const [activeTab, setActiveTab] = useState('text');
   const [textAccordionValue, setTextAccordionValue] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
 
   const [displayableAttachments, setDisplayableAttachments] = useState<DisplayableDataObject[]>([]);
+  const parsingProgress = recordContext?.parsingProgressByRecordId[record.id?.toString() || 'unknown'];
 
   const loadAttachmentPreviews = async () => {
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
@@ -128,7 +131,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
     };*/
   }, [])
 
-  useEffect(() => {
+useEffect(() => {
 
     if (isVisible) {      
       loadAttachmentPreviews();
@@ -142,7 +145,8 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
           console.log('Auto-translate enabled, setting up callback');
           recordContext?.parseRecord(record, async (parsedRecord) => {
              setIsTranslating(true); 
-             recordContext?.translateRecord(parsedRecord);
+             await recordContext?.translateRecord(parsedRecord);
+             setIsTranslating(false);
           });
         } else {
           console.log('Auto-translate disabled');
@@ -242,6 +246,12 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
           <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
             Record saved succesfully, processing in progress...
           </div>
+          {record.parseProgress && (
+            <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-4">
+              <FileText className="w-4 h-4 mr-2" />
+              Parse progress: {record.parseProgress.page} / {record.parseProgress.total}
+            </div>
+          )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
             {record.attachments.map((attachment, index) => (
@@ -263,7 +273,8 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                   />
                 ))}
               </div>
-            ): (displayableAttachmentsInProgress ? (<div className="mt-2 text-sm text-muted-foreground flex h-4 content-center gap-2">
+            ): (displayableAttachmentsInProgress ? (<div className="mt-2  text-zinc-500 dark:text-zinc-400  text-sm text-muted-foreground flex h-4 content-center gap-2">
+                <ImageIcon className="w-4 h-4 mr-2" />
                 <div role="status" className="w-4">
                     <svg aria-hidden="true" className="w-4 h-4 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
@@ -276,14 +287,15 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
 
           <div className="text-sm text-zinc-500 dark:text-zinc-400 text-left font-medium flex justify-center mt-2 pr-3">
             For all cool AI features, we need to OCR and parse record data first. Records in queue: {recordContext?.parseQueueLength}. Do not close the browser window. Parsing record in progress... <DataLoader />
-            <Button className="ml-2" onClick={
-              () => {
-                chatContext?.setChatOpen(true);
-                if (chatContext && chatContext.lastMessage !== null) {
-                  chatContext.lastMessage.visibility = MessageVisibility.Visible;
-                }
-              }
-            }>Check progress...</Button>
+            <Button
+              className="ml-2"
+              onClick={() => {
+                recordContext?.setParsingDialogRecordId(record.id?.toString() || 'unknown');
+                recordContext?.setParsingDialogOpen(true);
+              }}
+            >
+              Check progress...
+            </Button>
           </div>
 
         </div>
@@ -321,7 +333,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                       <div className="p-2">
                         {refIds.length === 1 ? (
                           <a href={`#records-${refIds[0]}`} className="text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:underline">
-                            {refRecords[0].record?.title || `#${refIds[0]}`}
+                            {refRecords[0].record?.id}: {refRecords[0].record?.title || `#${refIds[0]}`}
                           </a>
                         ) : (
                           <>
@@ -329,7 +341,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
                               {refRecords.map(({ id, record: refRecord }, index: number) => (
                                 <React.Fragment key={id}>
                                   <a href={`#records-${id}`} className="text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:underline">
-                                    {refRecord?.title || `#${id}`}
+                                    {refRecord?.id}: {refRecord?.title || `#${id}`}
                                   </a>
                                   {index < refIds.length - 1 && ', '}
                                 </React.Fragment>

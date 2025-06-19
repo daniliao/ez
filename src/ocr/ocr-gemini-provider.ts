@@ -7,7 +7,7 @@ import { RecordContextType } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record> {
+export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const geminiApiKey = await configContext?.getServerConfig('geminiApiKey') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
@@ -40,7 +40,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                         }
 
                         resultMessage.recordRef = record;
-                        updateParseProgress(record, false, null);
+                        updateParseProgress(record, false, 0, 0, null, null);
                         resultMessage.recordSaved = true;
                         await record.updateChecksumLastParsed();
                         const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);

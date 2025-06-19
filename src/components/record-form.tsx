@@ -89,7 +89,7 @@ export default function RecordForm({ folder, mode }: { folder?: Folder, mode?: R
 
   const dropZoneConfig = {
     maxFiles: 20,
-    maxSize: 1024 * 1024 * 100,
+    maxSize: 1024 * 1024 * 2048,
     multiple: true,
   };
 

@@ -89,6 +89,8 @@ export const recordDTOSchema = z.object({
   createdAt: z.string().default(() => getCurrentTS()),
   updatedAt: z.string().default(() => getCurrentTS()),
 
+  parseInProgress: z.boolean().optional().nullable(),
+
   // bc. we're using end 2 end encryption on the database level even JSON fields must be represented as string
   attachments: z.string().optional().nullable()
 });

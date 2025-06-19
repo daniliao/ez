@@ -15,11 +15,17 @@ export type TranslationBenchmarkContext = {
     aiTranslationRecord: Record;
 }
 
+export type ParseSinglePagePromptContext = {
+    record?: Record;
+    config?: ConfigContextType | null;
+    page?: number;
+}
+
 function recordDescriptionPrompt(context: PromptContext) {
     return `<summary-field>Please fill the "summary" field of the record based on these rules:
         0. Summary should be ALLWAYS IN ENGLISH.
-        1. Create a table with the following columns: page number, summary, types of data, importance
-        2. From the record text put into table actual page numbers, one sentece summary of the page content, types of medical record included on this page, overal importance (1-10 (higher is more important)) for the medical case descibed in the document
+        1. Create a table with the following columns titles: Page, Summary, Types of data, Importance
+        2. From the record text put into table columns actual: page numbers, one sentece summary of the page content, full english nice names of the types of medical record included on this page, overal importance (1-10 (higher is more important)) for the medical case descibed in the document
         3. Put the page numbers in table in this format: Page X
     </summary-field>`;
 }
@@ -43,6 +49,41 @@ export const prompts = {
                 Please format the response in markdown.`;
     },
 
+    recordParseSinglePage: (context: ParseSinglePagePromptContext) => {
+        return 'This is the page number: ' + context.page + '. Include the page number as a first line of the text: Page ' + context.page + ' \
+                If valid health data, please convert it to the markdown text exactly as it is in the original document. \
+                If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. \
+                Use markdown to make a nice format of the document - as close as possible to the original document. \
+                Return only markdown text of this document with no additions, comments, no intros no other answers. Just exact text. \
+                Resulting document should be in the same language as the original document. \
+                Do not add any terms or words that are not in the text. \
+                attachments to text. One attachment is a one page of the record. Include page numbers in markdown.  Please use markdown to format it nicely and return after JSON object'
+    }, 
+    recordParseMetadata: (context: ParseSinglePagePromptContext) => {
+        return 'Parse this medical record data text to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
+        First: JSON should be all in original language. \
+        Each medical record should be a row of returned JSON array of objects in format given below. \
+        First element of an array should be for metadata of all pages processed - and an overall summary of all items. \
+        <first_item> \
+        For this first summary item: \
+        - Summary the overal record - all the items - with a nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
+        ' + recordDescriptionPrompt(context) + '\
+        - Do not put into summary and title any terms or words that are not in the text. Add page number of the terms occurences to the terms used in the title and summary in () brackets. \
+        - Set the "type" to "metadata" and "subtype" to "summary". \
+        - Set the the other fields accordingly to the other items. \
+        </first_item> \
+        <next_items> \
+        For next items: \
+        If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data! \
+        Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
+        Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
+        extract very detailed and all features from it and put it as an array under "findings" key. \
+        </next_items> \
+        If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text.\
+       Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n <item_schema>\r\n\r\n```json\r\n \
+        ' + JSON.stringify(itemSchema) + '```\r\n\r\n</item_schema>\r\n\r\n <record_text>Record text: ' + context.record?.text + '</record_text>'
+    },
+    
     recordParseMultimodal: (context: PromptContext) => {
         return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, please parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
                 First: JSON should be all in original language. \

@@ -131,6 +131,7 @@ export type ChatContextType = {
     setAgentContext: (value: AgentContext) => void;
     setRecordsLoaded: (value: boolean) => void;
     aiDirectCall: (messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) => void;
+    aiDirectCallStream: (messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) => AsyncGenerator<string>;
     sendMessage: (msg: CreateMessageEnvelope, includeExistingMessagesAsContext?: boolean) => void;
     sendMessages: (msg: CreateMessagesEnvelope, includeExistingMessagesAsContext?: boolean) => void;
     autoCheck: (messages: MessageEx[], providerName?: string, modelName?: string) => void;
@@ -177,6 +178,7 @@ export const ChatContext = createContext<ChatContextType>({
     setAgentContext: (value: AgentContext) => {},
     setRecordsLoaded: (value: boolean) => {},
     aiDirectCall: (messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) => {},
+    aiDirectCallStream: (messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string) => {},
     autoCheck: (messages: MessageEx[], providerName?, modelName?: string) => {},
     sendMessage: (msg: CreateMessageEnvelope, includeExistingMessagesAsContext: boolean = true) => {},
     sendMessages: (msg: CreateMessagesEnvelope, includeExistingMessagesAsContext: boolean = true) => {},
@@ -369,6 +371,40 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
             toast.error(errMsg);
         }
 
+    }
+
+    /** make the auto check call to a different model */
+    async function* aiDirectCallStream(messages: MessageEx[], onResult?: OnResultCallback, providerName?: string, modelName?: string): AsyncGenerator<string> {
+        try {
+            let messagesToSend = messages;
+            const resultMessage: MessageEx = {
+                id: nanoid(),
+                content: '',
+                createdAt: new Date(),
+                role: 'assistant',
+                visibility: MessageVisibility.Visible
+            };
+            setIsCrossChecking(true);
+            const result = await streamText({
+                model: await aiProvider(providerName, modelName),
+                messages: convertToCoreMessages(messagesToSend),
+                temperature: process.env.NEXT_PUBLIC_CHAT_TEMPERATURE && modelName !== 'o1' ? parseFloat(process.env.NEXT_PUBLIC_CHAT_TEMPERATURE) : 1.0,
+                onFinish: async (e) => {
+                    resultMessage.finished = true;
+                    setIsCrossChecking(false);
+                    if (onResult) onResult(resultMessage, e);
+                }
+            });
+
+            for await (const delta of result.textStream) {
+                resultMessage.content += delta;
+                yield delta; // Yield each delta as it arrives
+            }
+        } catch (e) {
+            const errMsg = 'Error while streaming AI Auto Check response: ' + e;
+            toast.error(errMsg);
+            throw e; // Optionally rethrow for consumer to handle
+        }
     }
 
     const stopAgent = () => {
@@ -662,6 +698,7 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
         crossCheckResult,
         autoCheck,
         aiDirectCall,
+        aiDirectCallStream,
         setCrossCheckResult,
         agentContext,
         setAgentContext,

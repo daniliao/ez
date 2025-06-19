@@ -15,6 +15,12 @@ export type TranslationBenchmarkContext = {
     aiTranslationRecord: Record;
 }
 
+export type ParseSinglePagePromptContext = {
+    record?: Record;
+    config?: ConfigContextType | null;
+    page?: number;
+}
+
 function recordDescriptionPrompt(context: PromptContext) {
     return `<summary-field>Please fill the "summary" field of the record based on these rules:
         0. Summary should be ALLWAYS IN ENGLISH.
@@ -43,8 +49,10 @@ export const prompts = {
                 Please format the response in markdown.`;
     },
 
-    recordParseSinglePage: (context: PromptContext) => {
-        return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, please convert it to the markdown text exactly as it is in the original document. \
+    recordParseSinglePage: (context: ParseSinglePagePromptContext) => {
+        return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. \
+                This is the page number: ' + context.page + '. Include the page number as a first line of the text: Page ' + context.page + ' \
+                If valid health data, please convert it to the markdown text exactly as it is in the original document. \
                 If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text. \
                 Use markdown to make a nice format of the document - as close as possible to the original document. \
                 Return only markdown text of this document with no additions, comments, no intros no other answers. Just exact text. \

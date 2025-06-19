@@ -14,10 +14,22 @@ export async function parse(record: Record, chatContext: ChatContextType, config
     return new Promise(async (resolve, reject) => {
         try {
             // Prepare the prompt
-            const prompt = prompts.recordParseSinglePage({ record, config: configContext }); // TODO: add transcription if exists
 
             let page = 1;
             for (const image of sourceImages) {
+                const prompt = prompts.recordParseSinglePage({ record, config: configContext, page}); // TODO: add transcription if exists
+
+                chatContext.aiDirectCall([
+                    {
+                        id: 'page-' + page,
+                        role: 'user',
+                        content: prompt,
+                        type: MessageType.Parse,
+                        visibility: MessageVisibility.Private,
+                        createdAt: new Date(),
+                        experimental_attachments: [image]                         
+                    }
+                ]
                 // parsing page by page
 
                 page++;

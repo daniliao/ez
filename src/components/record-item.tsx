@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState, ReactNode } from "react";
-import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2, LanguagesIcon } from "lucide-react";
+import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2, LanguagesIcon, ImageIcon } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import Markdown from "react-markdown";
@@ -272,7 +272,8 @@ useEffect(() => {
                   />
                 ))}
               </div>
-            ): (displayableAttachmentsInProgress ? (<div className="mt-2 text-sm text-muted-foreground flex h-4 content-center gap-2">
+            ): (displayableAttachmentsInProgress ? (<div className="mt-2  text-zinc-500 dark:text-zinc-400  text-sm text-muted-foreground flex h-4 content-center gap-2">
+                <ImageIcon className="w-4 h-4 mr-2" />
                 <div role="status" className="w-4">
                     <svg aria-hidden="true" className="w-4 h-4 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>

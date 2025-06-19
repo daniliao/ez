@@ -33,7 +33,7 @@ export default function ParsingProgressDialog() {
         {parsingProgress ? (
           <>
             <div className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
-              Page: {parsingProgress.progress} / {parsingProgress.progressOf}
+              Page:  {parsingProgress.progress <= parsingProgress.progressOf ? parsingProgress.progress : parsingProgress.progressOf} / {parsingProgress.progressOf}
             </div>
             <div className="mb-2 w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded overflow-hidden">
               <div

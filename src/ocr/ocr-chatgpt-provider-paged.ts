@@ -21,6 +21,8 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             
             let recordText = '';
 
+            record = await updateParseProgress(record, true, 0, 0, null, null); // set in progress
+
 
             for (let pageAcc = 1; pageAcc <= page; pageAcc++) {
                 const pageText = await getRecordExtra(record, 'Page ' + pageAcc + ' content') as string; /// accumulate the page content - as we're saving it page by page

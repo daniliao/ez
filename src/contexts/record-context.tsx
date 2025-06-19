@@ -642,10 +642,10 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, metadata: any = null, error: any = null) : Promise<Record> => {
 
 
-        if(inProgress !== record.parseInProgress || error !== record.parseError) {
-          record.parseInProgress = inProgress;
-          record.parseError = error;
+        record.parseInProgress = inProgress;
+        record.parseError = error;
 
+        if(inProgress !== record.parseInProgress || error !== record.parseError) {
           setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
         }
 

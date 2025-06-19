@@ -59,6 +59,31 @@ export const prompts = {
                 Do not add any terms or words that are not in the text. \
                 attachments to text. One attachment is a one page of the record. Include page numbers in markdown.  Please use markdown to format it nicely and return after JSON object'
     }, 
+    recordParseMetadata: (context: ParseSinglePagePromptContext) => {
+        return 'Parse this medical record data text to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
+        First: JSON should be all in original language. \
+        Each medical record should be a row of returned JSON array of objects in format given below. \
+        First element of an array should be for metadata of all pages processed - and an overall summary of all items. \
+        <first_item> \
+        For this first summary item: \
+        - Summary the overal record - all the items - with a nice sentence and put it under "title". Extract keywords which are the medical examination results included in the record and put it in "tags" key including one tag equal to year of this record tags can not be personal data. \
+        ' + recordDescriptionPrompt(context) + '\
+        - Do not put into summary and title any terms or words that are not in the text. Add page number of the terms occurences to the terms used in the title and summary in () brackets. \
+        - Set the "type" to "metadata" and "subtype" to "summary". \
+        - Set the the other fields accordingly to the other items. \
+        </first_item> \
+        <next_items> \
+        For next items: \
+        If value contains multiple data (eg. numbers) store it as separate items. Freely extend it when needed to not miss any data! \
+        Include the type of this results in english (eg. "blood_results", "rmi") in "type" key of JSON and then more detailed type in "subtype" key.  \
+        Include the language of the document inside "language" key.  If the result is single block of text please try additionaly to saving text result  \
+        extract very detailed and all features from it and put it as an array under "findings" key. \
+        </next_items> \
+        If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text.\
+       Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n <item_schema>\r\n\r\n```json\r\n \
+        ' + JSON.stringify(itemSchema) + '```\r\n\r\n</item_schema>\r\n\r\n <record_text>Record text: ' + context.record?.text + '</record_text>'
+    },
+    
     recordParseMultimodal: (context: PromptContext) => {
         return 'Check if this data contains health results or info. If not return Error message + JSON: { error: ""}. If valid health data, please parse it to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
                 First: JSON should be all in original language. \

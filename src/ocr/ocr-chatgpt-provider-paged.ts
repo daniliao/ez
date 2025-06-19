@@ -42,16 +42,35 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                     await updateParseProgress(record, true, page, sourceImages.length, { textDelta: delta }, null);
                 }
 
-                
+                // Clean up pageText before saving
+                pageText = pageText.replace(/```[a-zA-Z]*\n?|```/g, '');
 
                 await updateParseProgress(record, true, page, sourceImages.length, { pageDelta: pageText }, null);
 
                 page++;
             }
+
+            const metadataStream = chatContext.aiDirectCallStream([
+                {
+                    id: 'metadata',
+                    role: 'user',
+                    content: prompts.recordParseMetadata({ record, config: configContext, page }),
+                }
+            ]);
+
+            let metaDataJson = '';
+            for await (const delta of metadataStream) {
+                metaDataJson += delta;
+            }
+
+            metaDataJson = metaDataJson.replace(/```[a-zA-Z]*\n?|```/g, '');
+
+            const fullTextToProcess = '```json\n' + metaDataJson + '\n```' + '```markdown\n' + recordText + '\n```';
+            const updatedRecord = await updateRecordFromText(fullTextToProcess, record, false);
+
+
             await record.updateChecksumLastParsed();
 
-
-            const updatedRecord = await updateRecordFromText(recordText, record, false);
             if (updatedRecord) {
                 resolve(updatedRecord);
             } else {

@@ -628,8 +628,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
           if (metadata && metadata.pageDelta) {
             record.text = record.text + metadata.pageDelta
-            setRecordExtra(record, 'Document parsed pages', progress.toString()); // update the record parse progress
-            setRecordExtra(record, 'Document pages total', progressOf.toString()); // update the record parse progress
+            setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
+            setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
   
             await updateRecord(record);
             setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
@@ -911,11 +911,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         }
       }    
 
-    const setRecordExtra = async (record: Record, type: string, value: string) => {
+    const setRecordExtra = async (record: Record, type: string, value: string, autosaveRecord: boolean = true) => {
         let recordEXTRA = record.extra || []
         recordEXTRA.find(p => p.type === type) ? recordEXTRA = recordEXTRA.map(p => p.type === type ? { ...p, value } : p) : recordEXTRA.push({ type, value })
         record = new Record({ ...record, extra: recordEXTRA });
-        await updateRecord(record);
+        if (autosaveRecord) {
+          await updateRecord(record);
+        }
     }
 
     const translateRecord = async (record: Record, language: string = 'English') => {

@@ -243,7 +243,8 @@ useEffect(() => {
             Record saved succesfully, processing in progress...
           </div>
           {record.parseProgress && (
-            <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
+            <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-4">
+              <FileText className="w-4 h-4 mr-2" />
               Parse progress: {record.parseProgress.page} / {record.parseProgress.total}
             </div>
           )}
@@ -283,10 +284,6 @@ useEffect(() => {
             For all cool AI features, we need to OCR and parse record data first. Records in queue: {recordContext?.parseQueueLength}. Do not close the browser window. Parsing record in progress... <DataLoader />
             <Button className="ml-2" onClick={
               () => {
-                chatContext?.setChatOpen(true);
-                if (chatContext && chatContext.lastMessage !== null) {
-                  chatContext.lastMessage.visibility = MessageVisibility.Visible;
-                }
               }
             }>Check progress...</Button>
           </div>

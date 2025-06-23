@@ -1016,26 +1016,19 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         while (true) {
           const pageContent = await getRecordExtra(record, 'Page ' + pageNum + ' content');
           if (!pageContent) break;
-          pages.push(pageContent);
+          pages.push(pageContent as string);
           pageNum++;
         }
         if (pages.length === 0 && record.text) {
           pages.push(record.text);
         }
 
-        // Check for already translated pages to resume
-        let lastTranslatedPage = 0;
-        const translatedPagesExtra = await getRecordExtra(record, 'Document translated pages');
-        if (translatedPagesExtra) {
-          lastTranslatedPage = parseInt(translatedPagesExtra, 10) || 0;
-        }
 
         let translatedPages: string[] = [];
-        let progress = lastTranslatedPage;
+        let progress = 0;
         setOperationStatus(DataLoadingStatus.Loading);
         // Prepare a placeholder for the translated record (will be created after all pages are translated)
-        let translatedRecordForExtras: Record | null = null;
-        for (let i = lastTranslatedPage; i < pages.length; i++) {
+        for (let i = 0; i < pages.length; i++) {
           let translatedPage = '';
           const stream = chatContext.aiDirectCallStream([
             {
@@ -1051,12 +1044,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           }
           translatedPages.push(translatedPage);
           progress++;
-          // Set the translated page as extra on the translated record (after it's created)
-          if (translatedRecordForExtras) {
-            record = await setRecordExtra(translatedRecordForExtras, `Page ${i + 1} content`, translatedPage, false);
-          }
-          // Update the progress extra on the original record
-          record = await setRecordExtra(record, 'Document translated pages', (i + 1).toString(), true);
         }
         // Join translated pages
         const translatedText = translatedPages.join('\n\n');
@@ -1071,6 +1058,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             content: prompts.recordParseMetadata({ record, config, page: pages.length, recordContent: translatedText }),
           }
         ], undefined, parseAIProvider, parseModelName);
+        
         for await (const delta of metadataStream) {
           metaDataJson += delta;
         }
@@ -1083,49 +1071,44 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           { type: 'Reference record Ids', value: record.id?.toString() || '' },
           { type: 'Translation language', value: language },
           { type: 'Preserved attachments', value: attachmentsCopy.map(att => att.id).join(', ') }
-        ]);
+        ]); // creates new record
 
         if (!translatedRecord) {
           setOperationStatus(DataLoadingStatus.Error);
           throw new Error('Failed to create translated record');
         }
+
         // Now that we have the translated record, set the extras for each page
-        translatedRecordForExtras = translatedRecord;
         for (let i = 0; i < translatedPages.length; i++) {
           translatedRecord = await setRecordExtra(translatedRecord, `Page ${i + 1} content`, translatedPages[i], false);
         }
-        // Remove the progress extra after translation is complete
-        record = await removeRecordExtra(record, 'Document translated pages', true);
 
-        if (translatedRecord) {
-          // Update the translated record with the original attachments and eventDate
-          translatedRecord.attachments = attachmentsCopy.map(dto => new EncryptedAttachment(dto));
-          translatedRecord.eventDate = record.eventDate || record.createdAt;
-          
+        // Update the translated record with the original attachments and eventDate
+        translatedRecord.attachments = attachmentsCopy.map(dto => new EncryptedAttachment(dto));
+        translatedRecord.eventDate = record.eventDate || record.createdAt;
+        
 
-          // Create a bi-directional reference by updating the original record
-          const translationRefsKey = 'Reference record Ids';
-          const existingTranslationRefs = record.extra?.find(e => e.type === translationRefsKey);
-          if (existingTranslationRefs && typeof existingTranslationRefs.value === 'string') {
-            // If there are existing translations, append the new one
-            const existingIds = existingTranslationRefs.value.split(',').map(id => id.trim());
-            if (!existingIds.includes(translatedRecord.id?.toString() || '')) {
-              existingTranslationRefs.value = [...existingIds, translatedRecord.id?.toString() || ''].join(', ');
-              record = await setRecordExtra(record, translationRefsKey, existingTranslationRefs.value, true);
-            }
-          } else {
-            // If this is the first translation, create new reference
-            translatedRecord = await setRecordExtra(translatedRecord, translationRefsKey, translatedRecord.id?.toString() || '', false);
+        // Create a bi-directional reference by updating the original record
+        const translationRefsKey = 'Reference record Ids';
+        const existingTranslationRefs = record.extra?.find(e => e.type === translationRefsKey);
+        if (existingTranslationRefs && typeof existingTranslationRefs.value === 'string') {
+          // If there are existing translations, append the new one
+          const existingIds = existingTranslationRefs.value.split(',').map(id => id.trim());
+          if (!existingIds.includes(translatedRecord.id?.toString() || '')) {
+            existingTranslationRefs.value = [...existingIds, translatedRecord.id?.toString() || ''].join(', ');
+            record = await setRecordExtra(record, translationRefsKey, existingTranslationRefs.value as string, false);
           }
-
-          translatedRecord = await updateRecord(translatedRecord); // save changes
-
-          setOperationStatus(DataLoadingStatus.Success);
-          return translatedRecord;
         } else {
-          setOperationStatus(DataLoadingStatus.Error);
-          throw new Error('Failed to create translated record');
+          // If this is the first translation, create new reference
+          record = await setRecordExtra(record, translationRefsKey, translatedRecord.id?.toString() || '', false);
         }
+
+        record = await updateRecord(record); // save changes to original record
+        translatedRecord = await updateRecord(translatedRecord); // save changes to translated record
+
+        setOperationStatus(DataLoadingStatus.Success);
+        return translatedRecord;
+
       } catch (error) {
         setOperationStatus(DataLoadingStatus.Error);
         console.error('Error translating record:', error);

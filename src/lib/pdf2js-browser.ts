@@ -6,6 +6,7 @@ const MAX_CANVAS_PIXELS = 16_777_216;
 
 // Detect iOS
 function isIOS(): boolean {
+  console.log('isIOS', typeof window, navigator.userAgent);
   if (typeof window === 'undefined') return false;
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
@@ -44,7 +45,7 @@ export async function convert(
   }
 
   // On iOS, use server-side conversion
-  if (isIOS() || process.env.NEXT_PUBLIC_CONVERT_PDF_SERVERSIDE) {
+  if (isIOS() && process.env.NEXT_PUBLIC_OPTIONAL_CONVERT_PDF_SERVERSIDE || process.env.NEXT_PUBLIC_CONVERT_PDF_SERVERSIDE) {
     let pdfBase64: string;
     
     if (typeof pdf === 'string') {

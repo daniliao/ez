@@ -7,6 +7,8 @@ import { getRecordExtra } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
+const AVERAGE_TOKENS_PER_PAGE = 1200;
+
 export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => Promise<Record>, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
@@ -49,15 +51,17 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                 }, parseAIProvider, parseModelName);
                 // parsing page by page
 
+                let chunkIndex = 0;
                 for await (const delta of stream) { 
                     pageText += delta;
-                    record = await updateParseProgress(record, true, page, sourceImages.length, { textDelta: delta }, null);
+                    record = await updateParseProgress(record, true, page * AVERAGE_TOKENS_PER_PAGE + chunkIndex, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, { textDelta: delta }, null);
+                    chunkIndex++;
                 }
 
                 // Clean up pageText before saving
                 pageText = pageText.replace(/```[a-zA-Z]*\n?|```/g, '');
                 recordText += pageText + '\n\r\n\r';
-                record = await updateParseProgress(record, true, page, sourceImages.length, { pageDelta: pageText, recordText: recordText }, null); //saves the record
+                record = await updateParseProgress(record, true, page * AVERAGE_TOKENS_PER_PAGE, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, { pageDelta: pageText, recordText: recordText }, null); //saves the record
 
                 page++;
             }
@@ -83,7 +87,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             await record.updateChecksumLastParsed();
 
             let updatedRecord = await updateRecordFromText(fullTextToProcess, record, false);
-            updatedRecord = await updateParseProgress(updatedRecord as Record, false, page, sourceImages.length, null, null);
+            updatedRecord = await updateParseProgress(updatedRecord as Record, false, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, { recordText: fullTextToProcess }, null);
 
 
 

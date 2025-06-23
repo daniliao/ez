@@ -20,6 +20,8 @@ const nextConfig = {
       });        
   
       config.module.noParse = /\.wasm$/;
+
+      
   
       config.module.rules.forEach((rule) => {
         (rule.oneOf || []).forEach((oneOf) => {

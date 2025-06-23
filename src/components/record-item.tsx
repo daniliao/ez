@@ -54,7 +54,7 @@ const MarkdownLinkHandler = ({node, href, children, ...props}: {node?: any; href
             (window as any).zoomableImages[imageId].open();
           }
         }}
-        className="text-black underline hover:text-blue-600 cursor-pointer"
+        className="text-black dark:text-white underline hover:text-blue-600 cursor-pointer"
       >
         {children}
       </a>

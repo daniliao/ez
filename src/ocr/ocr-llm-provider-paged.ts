@@ -7,7 +7,7 @@ import { getRecordExtra } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
-const AVERAGE_TOKENS_PER_PAGE = 1200;
+const AVERAGE_TOKENS_PER_PAGE = 1400;
 
 export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, page: number, pages: number, metadata: any, error: any) => Promise<Record>, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
@@ -69,6 +69,9 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                         totalProgressOfInTokens = parseProgressInTokens;
                     }
                 }
+
+                totalProgressOfInTokens += pageLengthInTokens * 1.5; // we estimate the metadata to be twice as long as the text for metadata
+                totalProgressOfInTokens -= AVERAGE_TOKENS_PER_PAGE; // actualize the estimate
 
                 // Clean up pageText before saving
                 pageText = pageText.replace(/```[a-zA-Z]*\n?|```/g, '');

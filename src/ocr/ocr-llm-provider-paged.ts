@@ -85,7 +85,8 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                     role: 'user',
                     content: prompts.recordParseMetadata({ record, config: configContext, page }),
                 }
-            ]);
+            ], async (resultMessage, result) => {
+            }, parseAIProvider, parseModelName);
 
             let metaDataJson = '';
            // totalProgressOfInTokens *= 1.6; // we estimate the metadata to be twice as long as the text

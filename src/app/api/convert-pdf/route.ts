@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { convertServerSide } from '@/lib/pdf2js-server';
 import { authorizeRequestContext } from '@/lib/generic-api';
+import { StorageService } from '@/lib/storage-service';
 
 export async function POST(request: NextRequest) {
   try {
 
-    const context = authorizeRequestContext(request);
+    const context = await authorizeRequestContext(request);
+    const storageService = new StorageService(context.databaseIdHash);
+    const tempDir = storageService.getTempDir();
 
     const body = await request.json();
     const { pdfBase64, conversion_config } = body;
@@ -17,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const images = await convertServerSide(pdfBase64, conversion_config || {});
+    const images = await convertServerSide(pdfBase64, conversion_config || {}, tempDir);
 
     return NextResponse.json({
       success: true,

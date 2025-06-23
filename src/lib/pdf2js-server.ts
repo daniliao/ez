@@ -2,7 +2,7 @@
 // with canvas and pdfjs-dist native modules
 
 import { spawn } from 'child_process';
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, readdirSync } from 'fs';
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, readdirSync, rmdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -17,7 +17,8 @@ function isValidPDF(pdfData: Uint8Array): boolean {
 
 export async function convertServerSide(
   pdfBase64: string,
-  conversion_config: { image_format?: string, height?: number, scale?: number, width?: number } = {}
+  conversion_config: { image_format?: string, height?: number, scale?: number, width?: number } = {},
+  tempDir: string
 ): Promise<string[]> {
   //console.log('Conversion config received:', conversion_config);
   
@@ -31,7 +32,6 @@ export async function convertServerSide(
   }
 
   // Create temporary files
-  const tempDir = tmpdir();
   const timestamp = Date.now();
   const randomId = Math.random().toString(36).substr(2, 9);
   const pdfPath = join(tempDir, `temp_${timestamp}_${randomId}.pdf`);
@@ -110,6 +110,7 @@ export async function convertServerSide(
             unlinkSync(imagePath);
           }
           unlinkSync(pdfPath);
+          rmdirSync(outputDir);
 
 
           resolve(images);

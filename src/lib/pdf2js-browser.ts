@@ -7,8 +7,7 @@ const MAX_CANVAS_PIXELS = 16_777_216;
 // Detect iOS
 function isIOS(): boolean {
   if (typeof window === 'undefined') return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 
 /**

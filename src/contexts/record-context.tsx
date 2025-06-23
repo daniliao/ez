@@ -178,13 +178,15 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     const [sortBy, setSortBy] = useState<string>('eventDate desc');
     const [parsingProgressByRecordId, setParsingProgressByRecordId] = useState<{
       [recordId: string]: {
+        page: number;
+        pages: number;
         progress: number;
         progressOf: number;
         metadata: any;
         textDelta: string;
         pageDelta: string;
         recordText?: string;
-        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
+        history: { progress: number; progressOf: number; page: number; pages: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
       }
     }>({});
     const [parsingDialogOpen, setParsingDialogOpen] = useState(false);
@@ -660,7 +662,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         if (progress > 0 && progressOf > 0) {
 
           record.parseProgress = {
-            page: progress,
+            page: page,
+            pages: pages,
+            progress: progress,
             progressOf: progressOf,
             textDelta: metadata?.textDelta,
             pageDelta: metadata?.pageDelta,
@@ -669,13 +673,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
           if (metadata && metadata.pageDelta && metadata.recordText) { // new page parsed
             record.text = metadata.recordText;
-            record = await setRecordExtra(record, 'Page ' + progress.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
+            record = await setRecordExtra(record, 'Page ' + page.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
 
             if (progress === (progressOf - 1)) {
               removeRecordExtra(record, 'Document parsed pages', false);
             } else {
-              record = await setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
-              record = await setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
+              record = await setRecordExtra(record, 'Document parsed pages', page.toString(), false); // update the record parse progress
+              record = await setRecordExtra(record, 'Document pages total', pages.toString(), false); // update the record parse progress
             }
   
             record = await updateRecord(record);
@@ -690,13 +694,15 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               [id]: {
                 progress,
                 progressOf,
+                page,
+                pages,
                 metadata,
                 textDelta: (prev[id]?.textDelta || '') + (metadata?.textDelta || ''),
                 pageDelta: metadata?.pageDelta || '',
                 recordText: metadata?.recordText || '',
                 history: [
                   ...prevHistory,
-                  { progress, progressOf, metadata, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
+                  { progress, progressOf, metadata, page, pages, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
                 ]
               }
             };

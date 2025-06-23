@@ -249,7 +249,7 @@ useEffect(() => {
           {record.parseProgress && (
             <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-4">
               <FileText className="w-4 h-4 mr-2" />
-              Parse progress: {record.parseProgress.page} / {record.parseProgress.pages}
+              Parsed pages: {record.parseProgress.page} / {record.parseProgress.pages}
             </div>
           )}
           {record.parseProgress &&

@@ -5,6 +5,12 @@ import PasswordValidator from 'password-validator';
 import { getCurrentTS } from "@/lib/utils";
 import { sha256 } from "@/lib/crypto";
 
+export enum RegisteredOperations {
+    Parse = 'parse',
+    Translate = 'translate'
+}
+ 
+
 
 export enum DataLoadingStatus {
     Idle = 'idle',
@@ -186,8 +192,9 @@ export class Record {
     checksum: string;
     checksumLastParsed: string;
 
-    parseInProgress: boolean = false;
-    parseError: any = null;
+    operationName: string = '';
+    operationInProgress: boolean = false;
+    operationError: any = null;
     operationProgress?: OperationProgress;
     postParseCallback?: PostParseCallback;
   
@@ -201,8 +208,9 @@ export class Record {
       this.text = recordSource.text ? recordSource.text : '';
       this.checksum = recordSource.checksum ? recordSource.checksum : '';
       this.checksumLastParsed = recordSource.checksumLastParsed ? recordSource.checksumLastParsed : '';
-      this.parseInProgress = recordSource.parseInProgress ? recordSource.parseInProgress : false;
-      this.operationProgress = recordSource.operationProgress ? recordSource.operationProgress : null;
+      this.operationInProgress = recordSource.operationInProgress ? recordSource.operationInProgress : false;
+      this.operationProgress = recordSource.operationProgress ? recordSource.operationProgress : undefined;
+      this.operationName = recordSource.operationName ? recordSource.operationName : '';
       
 
       

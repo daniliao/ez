@@ -1,4 +1,4 @@
-import { DisplayableDataObject, Record } from '@/data/client/models';
+import { DisplayableDataObject, Record, RegisteredOperations } from '@/data/client/models';
 import { ChatContextType, MessageType } from '@/contexts/chat-context';
 import { ConfigContextType } from '@/contexts/config-context';
 import { prompts } from '@/data/ai/prompts';
@@ -10,7 +10,7 @@ interface ParseWithAIDirectCallParams {
     chatContext: ChatContextType;
     configContext: ConfigContextType | null;
     updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record | null>;
-    updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, page: number, pages: number, metadata: any, error: any) => Promise<Record>;
+    updateOperationProgress: (record: Record, operationName: string, inProgress: boolean, progress: number, progressOf: number, page: number, pages: number, metadata: any, error: any) => Promise<Record>;
     sourceImages: DisplayableDataObject[];
     parseAIProvider: string;
     parseModelName: string;
@@ -23,7 +23,7 @@ export async function parseWithAIDirectCall({
     chatContext,
     configContext,
     updateRecordFromText,
-    updateParseProgress,
+    updateOperationProgress,
     sourceImages,
     parseAIProvider,
     parseModelName
@@ -39,7 +39,7 @@ export async function parseWithAIDirectCall({
 
             let content = '';
             let error: any = null;
-            record = await updateParseProgress(record, true, 0, 0, 0, 0, null, null);
+            record = await updateOperationProgress(record, RegisteredOperations.Parse, true, 0, 0, 0, 0, null, null);
 
             const stream = chatContext.aiDirectCallStream([
                 {
@@ -57,11 +57,11 @@ export async function parseWithAIDirectCall({
             for await (const delta of stream) {
                 content += delta;
                 chunkIndex++;
-                record = await updateParseProgress(record, true, chunkIndex, totalTokensEstimage,  0, 0, { textDelta: delta, accumulated: content }, null);
+                record = await updateOperationProgress(record, RegisteredOperations.Parse, true, chunkIndex, totalTokensEstimage,  0, 0, { textDelta: delta, accumulated: content }, null);
             }
 
             // After streaming is done
-            record = await updateParseProgress(record, false, chunkIndex, totalTokensEstimage, 0, 0, { recordText: content, pageDelta: content }, null);
+            record = await updateOperationProgress(record, RegisteredOperations.Parse, false, chunkIndex, totalTokensEstimage, 0, 0, { recordText: content, pageDelta: content }, null);
             await record.updateChecksumLastParsed();
             const updatedRecord = await updateRecordFromText(content, record, false);
             if (updatedRecord) {
@@ -70,7 +70,7 @@ export async function parseWithAIDirectCall({
                 reject(new Error('Failed to update record'));
             }
         } catch (err) {
-            updateParseProgress(record, false, chunkIndex, 0, 0, 0, null, err);
+            updateOperationProgress(record, RegisteredOperations.Parse, false, chunkIndex, 0, 0, 0, null, err);
             reject(err);
         }
     });

@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect, useContext, PropsWithChildre
 import { EncryptedAttachmentDTO, EncryptedAttachmentDTOEncSettings, RecordDTO } from '@/data/dto';
 import { RecordApiClient } from '@/data/client/record-api-client';
 import { ApiEncryptionConfig } from '@/data/client/base-api-client';
-import { DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record, PostParseCallback } from '@/data/client/models';
+import { DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record, PostParseCallback, RegisteredOperations } from '@/data/client/models';
 import { ConfigContext, ConfigContextType } from '@/contexts/config-context';
 import { toast } from 'sonner';
 import { sort } from 'fast-sort';
@@ -649,13 +649,14 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           })
       }
     
-      const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, page: number = 0, pages: number = 0, metadata: any = null, error: any = null) : Promise<Record> => {
+      const updateOperationProgress = async (record: Record, operation: string, inProgress: boolean, progress: number = 0, progressOf: number = 0, page: number = 0, pages: number = 0, metadata: any = null, error: any = null) : Promise<Record> => {
 
 
-        record.parseInProgress = inProgress;
-        record.parseError = error;
+        record.operationName = operation;
+        record.operationInProgress = inProgress;
+        record.operationError = error;
 
-        if(inProgress !== record.parseInProgress || error !== record.parseError) {
+        if(inProgress !== record.operationInProgress || error !== record.operationError) {
           setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state
         }
 
@@ -715,7 +716,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       const processParseQueue = async () => {
         if (parseQueueInProgress) {
           for(const pr of parseQueue) {
-            await updateParseProgress(pr, true);
+            await updateOperationProgress(pr, RegisteredOperations.Parse, true);
           }
           console.log('Parse queue in progress');
           return;
@@ -727,7 +728,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           try {
             currentRecord = parseQueue[0] as Record;
             console.log('Processing record: ', currentRecord, parseQueue.length);
-            await updateParseProgress(currentRecord, true);
+            await updateOperationProgress(currentRecord, RegisteredOperations.Parse, true);
             
             setOperationStatus(DataLoadingStatus.Loading);
             const attachments = await convertAttachmentsToImages(currentRecord);
@@ -740,13 +741,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             let updatedRecord: Record | null = null;
             try {
               if (ocrProvider === 'chatgpt') {
-                updatedRecord = await chatgptParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+                updatedRecord = await chatgptParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateOperationProgress, attachments);
               } else if (ocrProvider === 'tesseract') {
-                updatedRecord = await tesseractParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+                updatedRecord = await tesseractParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateOperationProgress, attachments);
               } else if (ocrProvider === 'gemini') {
-                updatedRecord = await geminiParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+                updatedRecord = await geminiParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateOperationProgress, attachments);
               } else if (ocrProvider === 'llm-paged') {
-                updatedRecord = await chatgptPagedParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
+                updatedRecord = await chatgptPagedParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateOperationProgress, attachments);
               } else {
                 toast.error('Unknown OCR provider: ' + ocrProvider);
                 updatedRecord = null;
@@ -759,7 +760,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             } catch (error) {
               console.error('Error processing record:', error);
               toast.error('Error processing record: ' + error);
-              if (currentRecord) updateParseProgress(currentRecord, false, 0, 0, 0, 0, null, error);
+              if (currentRecord) updateOperationProgress(currentRecord, RegisteredOperations.Parse, false, 0, 0, 0, 0, null, error);
             }
 
             console.log('Record parsed, taking next record', currentRecord);
@@ -769,7 +770,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             parseQueue = parseQueue.slice(1); // remove one item
             parseQueueLength = parseQueue.length;
 
-            if (currentRecord) updateParseProgress(currentRecord, false, 0, 0, 0, 0, null, error);
+            if (currentRecord) updateOperationProgress(currentRecord, RegisteredOperations.Parse, false, 0, 0, 0, 0, null, error);
           }
         }
         parseQueueInProgress = false;

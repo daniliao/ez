@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
+import { DisplayableDataObject, Record, DataLoadingStatus, RegisteredOperations } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2, LanguagesIcon, ImageIcon } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
@@ -138,7 +138,7 @@ useEffect(() => {
     }
 
     async function parseRecord() {
-      if (await configContext?.getServerConfig('autoParseRecord') && (record.checksum !== record.checksumLastParsed) && !record.parseInProgress && !record.parseError && (new Date().getTime() - new Date(record.updatedAt).getTime()) < 1000 * 60 * 60 /* parse only records changed up to 1 h */) { // TODO: maybe we need to add "parsedDate" or kind of checksum (better!) to make sure the record is parseed only when something changed
+      if (await configContext?.getServerConfig('autoParseRecord') && (record.checksum !== record.checksumLastParsed) && !record.operationInProgress && !record.operationError && (new Date().getTime() - new Date(record.updatedAt).getTime()) < 1000 * 60 * 60 /* parse only records changed up to 1 h */) { // TODO: maybe we need to add "parsedDate" or kind of checksum (better!) to make sure the record is parseed only when something changed
         console.log('Adding to parse queue due to checksum mismatch ', record.id, record.checksum, record.checksumLastParsed);
         const autoTranslate = await configContext?.getServerConfig('autoTranslateRecord');
         if (autoTranslate) {  // Check for exact string 'true'
@@ -199,8 +199,8 @@ useEffect(() => {
   }, [isTranslating]);
 
   const handleTranslation = async () => {
-    if (record.parseInProgress) {
-      toast.info('Please wait until record is successfully parsed');
+    if (record.operationInProgress) {
+      toast.info('Please wait until record is successfully processed');
       return;
     }
     
@@ -241,7 +241,7 @@ useEffect(() => {
   };
 
   return (
-      record.parseInProgress ? (
+      record.operationInProgress && record.operationName === RegisteredOperations.Parse ? (
         <div className="bg-zinc-100 dark:bg-zinc-800 md:p-4 xs:p-2 md:rounded-md mb-4 xs:mb-2">
           <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
             Record saved succesfully, processing in progress...
@@ -325,7 +325,7 @@ useEffect(() => {
             (record.json) ? (
               <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{record.id}: {labels.recordItemLabel(record.type, { record })}</div>
             ) : (
-              <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{record.parseInProgress ? 'Parsing record in progres...' : 'Record uploaded, no additional data. Maybe try uploading again?' }</div>
+              <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{record.operationInProgress ? 'Parsing record in progres...' : 'Record uploaded, no additional data. Maybe try uploading again?' }</div>
             ) 
           )}
           <div className="text-xs text-zinc-500 dark:text-zinc-400 flex"><CalendarIcon className="w-4 h-4" /> {record.eventDate ? record.eventDate : record.createdAt}</div>
@@ -462,7 +462,7 @@ useEffect(() => {
                         <div className="flex gap-2">
                           <Button size="icon" variant="ghost" title="Edit text" onClick={(e) => {
                             e.stopPropagation(); // Prevent accordion from toggling
-                            if(record.parseInProgress) { 
+                            if(record.operationInProgress) { 
                               toast.info('Please wait until record is successfully parsed') 
                             } else {  
                               recordContext?.setCurrentRecord(record);  
@@ -547,17 +547,17 @@ useEffect(() => {
           ) : null
         )}
         <div ref={thisElementRef} className="mt-2 flex items-center gap-2">
-          <Button size="icon" variant="ghost" title="Edit record" onClick={() => { if(record.parseInProgress) { toast.info('Please wait until record is successfully parsed') } else {  recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true); } }}>
+          <Button size="icon" variant="ghost" title="Edit record" onClick={() => { if(record.operationInProgress) { toast.info('Please wait until record is successfully parsed') } else {  recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true); } }}>
             <PencilIcon className="w-4 h-4" />
           </Button>        
-          <Button size="icon" variant="ghost" title="Add attachments" onClick={() => { if(record.parseInProgress) { toast.info('Please wait until record is successfully parsed') } else {   recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true);}  }}>
+          <Button size="icon" variant="ghost" title="Add attachments" onClick={() => { if(record.operationInProgress) { toast.info('Please wait until record is successfully parsed') } else {   recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true);}  }}>
             <PaperclipIcon className="w-4 h-4" />
           </Button>
           <Button size="icon" variant="ghost" title="Download record as HTML" onClick={() => downloadAsHtml(record.text || record.description, `record-${record.id}`)}>
             <DownloadIcon className="w-4 h-4" />
           </Button>
           <Button size="icon" variant="ghost" title="Parse record" onClick={async () => {
-            if (record.parseInProgress) {
+            if (record.operationInProgress) {
               toast.info('Record parsing already in progress');
               return;
             }

@@ -1079,8 +1079,10 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         
         for await (const delta of metadataStream) {
           metaDataJson += delta;
+          pagesTokensProcessed += 1;
+          // Update translation progress UI here
           record = await updateOperationProgress(record, RegisteredOperations.Translate, true, pagesTokensProcessed, totalPagesTokens, pages.length, pages.length, { textDelta: delta }, null);
-        }
+      }
         metaDataJson = metaDataJson.replace(/```[a-zA-Z]*\n?|```/g, '');
         const fullTextToProcess = '```json\n' + metaDataJson + '\n```\n\n```markdown\n' + translatedText + '\n```';
 

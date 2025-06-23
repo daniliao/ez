@@ -59,7 +59,7 @@ export const prompts = {
                 Do not add any terms or words that are not in the text. \
                 attachments to text. One attachment is a one page of the record. Include page numbers in markdown.  Please use markdown to format it nicely and return after JSON object'
     }, 
-    recordParseMetadata: (context: ParseSinglePagePromptContext) => {
+    recordParseMetadata: (context: ParseSinglePagePromptContext & { recordContent?: string }) => {
         return 'Parse this medical record data text to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
         First: JSON should be all in original language. \
         Each medical record should be a row of returned JSON array of objects in format given below. \
@@ -81,7 +81,7 @@ export const prompts = {
         </next_items> \
         If the document is handwritten then dates are also handwritten most of the times, do not guess the dates from what is for example a footnotes/template notes. Try to not make any assumptions/interpretations over what is literally in the text.\
        Do not add to the text anything not explicitly existing in the source documents. \r\n\r\n <item_schema>\r\n\r\n```json\r\n \
-        ' + JSON.stringify(itemSchema) + '```\r\n\r\n</item_schema>\r\n\r\n <record_text>Record text: ' + context.record?.text + '</record_text>'
+        ' + JSON.stringify(itemSchema) + '```\r\n\r\n</item_schema>\r\n\r\n <record_text>Record text: ' + (context.recordContent ? context.recordContent : context.record?.text) + '</record_text>'
     },
     
     recordParseMultimodal: (context: PromptContext) => {
@@ -214,6 +214,9 @@ export const prompts = {
     },
     translateRecordText: (context: PromptContext & { language: string}) => {
         return 'Translate this health record to ' + context.language + ' language, Be as exact as possible. Do not add any custom interpretations over medical terms.  Return full text, do not shorten anytrhing. Return full translated markdown and JSON ' + context.record?.description + ' ' + context.record?.text;
+    },
+    translateRecordTextByPage: (context: PromptContext & { language: string, page: number, pageContent: string}) => {
+        return 'Translate this page, no: ' + context.page + ', of health record to ' + context.language + ' language, Be as exact as possible. Keep markdown formatting as close to original as possible. Do not add any custom interpretations over medical terms.  Return full text, do not shorten anytrhing. Return full translated markdown and nothing else' + context.pageContent;
     },
     recordSummary: (context: PromptContext) => {
         return 'Summarize the health result data below in one sentence: ' + context.record?.text

@@ -1023,17 +1023,26 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           pages.push(record.text);
         }
 
+        // Check for already translated pages to resume
+        let lastTranslatedPage = 0;
+        const translatedPagesExtra = await getRecordExtra(record, 'Document translated pages');
+        if (translatedPagesExtra) {
+          lastTranslatedPage = parseInt(translatedPagesExtra, 10) || 0;
+        }
+
         let translatedPages: string[] = [];
-        let progress = 0;
+        let progress = lastTranslatedPage;
         setOperationStatus(DataLoadingStatus.Loading);
-        for (let i = 0; i < pages.length; i++) {
+        // Prepare a placeholder for the translated record (will be created after all pages are translated)
+        let translatedRecordForExtras: Record | null = null;
+        for (let i = lastTranslatedPage; i < pages.length; i++) {
           let translatedPage = '';
           const stream = chatContext.aiDirectCallStream([
             {
               id: nanoid(),
               role: 'user',
               createdAt: new Date(),
-              content: prompts.translateRecordText({ record, language, page: i + 1, text: pages[i] }),
+              content: prompts.translateRecordTextByPage({ record, language, page: i + 1, pageContent: pages[i] }),
             }
           ], undefined, parseAIProvider, parseModelName);
           for await (const delta of stream) {
@@ -1042,6 +1051,12 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           }
           translatedPages.push(translatedPage);
           progress++;
+          // Set the translated page as extra on the translated record (after it's created)
+          if (translatedRecordForExtras) {
+            record = await setRecordExtra(translatedRecordForExtras, `Page ${i + 1} content`, translatedPage);
+          }
+          // Update the progress extra on the original record
+          record = await setRecordExtra(record, 'Document translated pages', (i + 1).toString());
         }
         // Join translated pages
         const translatedText = translatedPages.join('\n\n');
@@ -1053,7 +1068,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             id: nanoid(),
             role: 'user',
             createdAt: new Date(),
-            content: prompts.recordParseMetadata({ record, config, page: pages.length }),
+            content: prompts.recordParseMetadata({ record, config, page: pages.length, recordContent: translatedText }),
           }
         ], undefined, parseAIProvider, parseModelName);
         for await (const delta of metadataStream) {
@@ -1074,6 +1089,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           setOperationStatus(DataLoadingStatus.Error);
           throw new Error('Failed to create translated record');
         }
+        // Now that we have the translated record, set the extras for each page
+        translatedRecordForExtras = translatedRecord;
+        for (let i = 0; i < translatedPages.length; i++) {
+          record = await setRecordExtra(translatedRecordForExtras, `Page ${i + 1} content`, translatedPages[i]);
+        }
+        // Remove the progress extra after translation is complete
+        record = await removeRecordExtra(record, 'Document translated pages');
 
         if (translatedRecord) {
           // Update the translated record with the original attachments and eventDate
@@ -1089,11 +1111,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             const existingIds = existingTranslationRefs.value.split(',').map(id => id.trim());
             if (!existingIds.includes(updatedTranslatedRecord.id?.toString() || '')) {
               existingTranslationRefs.value = [...existingIds, updatedTranslatedRecord.id?.toString()].join(', ');
-              await setRecordExtra(record, translationRefsKey, existingTranslationRefs.value);
+              record =await setRecordExtra(record, translationRefsKey, existingTranslationRefs.value);
             }
           } else {
             // If this is the first translation, create new reference
-            await setRecordExtra(record, translationRefsKey, updatedTranslatedRecord.id?.toString() || '');
+            record = await setRecordExtra(record, translationRefsKey, updatedTranslatedRecord.id?.toString() || '');
           }
 
           setOperationStatus(DataLoadingStatus.Success);

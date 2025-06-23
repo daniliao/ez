@@ -121,6 +121,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
     if (displayAttachmentPreviews && !displayableAttachmentsInProgress && lastlyLoadedCacheKey !== currentCacheKey) {
       setDisplayableAttachmentsInProgress(true);
+      setDisplayableAttachments([]);
       try {
         const attachments = await recordContext?.convertAttachmentsToImages(record, false);
         setDisplayableAttachments(attachments as DisplayableDataObject[]);
@@ -297,12 +298,12 @@ useEffect(() => {
               <div className="mt-2 flex-wrap flex items-center justify-left min-h-100 w-full">
                 {displayableAttachments.map((attachment, index) => (
                   <ZoomableImage
-                    key={`attachment-${record.id}-${index}`}
+                    key={`attachment-${record.id}-${index}-${Date.now()}`}
                     src={attachment.url}
                     alt={`Page ${index + 1}`}
                     width={100}
                     height={100}
-                    className="w-100 pr-2 pb-2"
+                    className="w-100 pr-2 pb-2 cursor-pointer"
                     id={`image-${record.id}-${index}`}
                   />
                 ))}
@@ -549,7 +550,7 @@ useEffect(() => {
             <div className="mt-4 flex-wrap flex items-center justify-left min-h-100 w-full">
               {displayableAttachments.map((attachment, index) => (
                 <ZoomableImage
-                  key={`attachment-${record.id}-${index}`}
+                  key={`attachment-${record.id}-${index}-${lastlyLoadedCacheKey}`}
                   src={attachment.url}
                   alt={`Page ${index + 1}`}
                   width={100}

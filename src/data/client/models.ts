@@ -160,7 +160,9 @@ export type PostParseCallback = (record: Record) => Promise<void>;
 
 export type ParseProgress = {
     page: number;
-    total: number;
+    pages: number;
+    progress: number;
+    progressOf: number;
     textDelta?: string;
     pageDelta?: string;
     recordText?: string;

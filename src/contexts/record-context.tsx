@@ -147,11 +147,13 @@ export type RecordContextType = {
       [recordId: string]: {
         progress: number;
         progressOf: number;
+        page: number;
+        pages: number;
         metadata: any;
         textDelta: string;
         pageDelta: string;
         recordText?: string;
-        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
+        history: { progress: number; progressOf: number; page: number; pages: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
       }
     };
     parsingDialogOpen: boolean;
@@ -645,7 +647,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           })
       }
     
-      const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, metadata: any = null, error: any = null) : Promise<Record> => {
+      const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, page: number = 0, pages: number = 0, metadata: any = null, error: any = null) : Promise<Record> => {
 
 
         record.parseInProgress = inProgress;
@@ -659,7 +661,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
           record.parseProgress = {
             page: progress,
-            total: progressOf,
+            progressOf: progressOf,
             textDelta: metadata?.textDelta,
             pageDelta: metadata?.pageDelta,
             recordText: metadata?.recordText

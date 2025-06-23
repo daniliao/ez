@@ -1010,7 +1010,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         const parseAIProvider = await config?.getServerConfig('llmProviderParse') as string;
         const parseModelName = await config?.getServerConfig('llmModelParse') as string;
 
-        return new Promise<Record>((resolve, reject) => {
+        return new Promise<Record>((resolve, reject) => { // TODO: in case of context errors lets use the page by page translation strategy
           chatContext?.aiDirectCall([{
               id: nanoid(),
               role: 'user',

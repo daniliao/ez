@@ -5,6 +5,14 @@ import PasswordValidator from 'password-validator';
 import { getCurrentTS } from "@/lib/utils";
 import { sha256 } from "@/lib/crypto";
 
+export enum RegisteredOperations {
+    Parse = 'parse',
+    Translate = 'translate'
+}
+
+export const AVERAGE_PAGE_TOKENS = 1000;
+ 
+
 
 export enum DataLoadingStatus {
     Idle = 'idle',
@@ -158,9 +166,10 @@ export type RecordItem = z.infer<typeof recordItemSchema>;
 
 export type PostParseCallback = (record: Record) => Promise<void>;
 
-export type ParseProgress = {
+export type OperationProgress = {
     page: number;
     pages: number;
+    operationName: string;
     progress: number;
     progressOf: number;
     textDelta?: string;
@@ -186,9 +195,10 @@ export class Record {
     checksum: string;
     checksumLastParsed: string;
 
-    parseInProgress: boolean = false;
-    parseError: any = null;
-    parseProgress?: ParseProgress;
+    operationName: string = '';
+    operationInProgress: boolean = false;
+    operationError: any = null;
+    operationProgress?: OperationProgress;
     postParseCallback?: PostParseCallback;
   
     constructor(recordSource: RecordDTO | Record) {
@@ -201,8 +211,10 @@ export class Record {
       this.text = recordSource.text ? recordSource.text : '';
       this.checksum = recordSource.checksum ? recordSource.checksum : '';
       this.checksumLastParsed = recordSource.checksumLastParsed ? recordSource.checksumLastParsed : '';
-      this.parseInProgress = recordSource.parseInProgress ? recordSource.parseInProgress : false;
-      this.parseProgress = recordSource.parseProgress ? recordSource.parseProgress : null;
+      this.operationInProgress = recordSource.operationInProgress ? recordSource.operationInProgress : false;
+      this.operationProgress = recordSource.operationProgress ? recordSource.operationProgress : undefined;
+      this.operationName = recordSource.operationName ? recordSource.operationName : '';
+      
 
       
     if(recordSource instanceof Record) {

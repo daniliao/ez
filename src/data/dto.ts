@@ -89,13 +89,14 @@ export const recordDTOSchema = z.object({
   createdAt: z.string().default(() => getCurrentTS()),
   updatedAt: z.string().default(() => getCurrentTS()),
 
-  parseProgress: z.object({
+  operationName: z.string().optional().nullable(),
+  operationProgress: z.object({
     page: z.number().positive().int(),
     pages: z.number().positive().int(),
     progress: z.number().positive().int(),
     progressOf: z.number().positive().int(),
   }).optional().nullable(),
-  parseInProgress: z.boolean().optional().nullable(),
+  operationInProgress: z.boolean().optional().nullable(),
 
   // bc. we're using end 2 end encryption on the database level even JSON fields must be represented as string
   attachments: z.string().optional().nullable()

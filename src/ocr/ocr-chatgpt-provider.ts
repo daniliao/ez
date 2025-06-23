@@ -14,7 +14,7 @@ export async function parse(
     configContext: ConfigContextType | null,
     folderContext: FolderContextType | null,
     updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record | null>,
-    updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => void,
+    updateOperationProgress: (record: Record, operationName: string, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => void,
     sourceImages: DisplayableDataObject[]
 ): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
@@ -25,7 +25,7 @@ export async function parse(
         chatContext,
         configContext,
         updateRecordFromText,
-        updateParseProgress,
+        updateOperationProgress,
         sourceImages,
         parseAIProvider,
         parseModelName

@@ -1,4 +1,4 @@
-import { DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record } from '@/data/client/models';
+import { AVERAGE_PAGE_TOKENS, DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record, RegisteredOperations } from '@/data/client/models';
 import { findCodeBlocks } from "@/lib/utils";
 import { AIResultEventType, ChatContextType, MessageType, MessageVisibility } from '@/contexts/chat-context';
 import { ConfigContextType } from '@/contexts/config-context';
@@ -7,15 +7,14 @@ import { getRecordExtra } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
-const AVERAGE_TOKENS_PER_PAGE = 1400;
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, page: number, pages: number, metadata: any, error: any) => Promise<Record>, sourceImages: DisplayableDataObject[]): Promise<Record> {
+export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateOperationProgress: (record: Record, operationName: string, inProgress: boolean, progress: number, progressOf: number, page: number, pages: number, metadata: any, error: any) => Promise<Record>, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
 
     const parseProgressInPages = parseInt(await getRecordExtra(record, 'Document parsed pages') as string || '0');
-    let parseProgressInTokens = parseProgressInPages * AVERAGE_TOKENS_PER_PAGE;
-    let totalProgressOfInTokens = sourceImages.length * AVERAGE_TOKENS_PER_PAGE;
+    let parseProgressInTokens = parseProgressInPages * AVERAGE_PAGE_TOKENS;
+    let totalProgressOfInTokens = sourceImages.length * AVERAGE_PAGE_TOKENS;
 
     return new Promise(async (resolve, reject) => {
         try {
@@ -26,7 +25,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             
             let recordText = '';
 
-            record = await updateParseProgress(record, true, 0, 0, 0, 0, null, null); // set in progress
+            record = await updateOperationProgress(record, RegisteredOperations.Parse, true, 0, 0, 0, 0, null, null); // set in progress
 
 
             for (let pageAcc = 1; pageAcc <= page; pageAcc++) {
@@ -60,7 +59,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                 let chunkIndex = 0;
                 for await (const delta of stream) { 
                     pageText += delta;
-                    record = await updateParseProgress(record, true, parseProgressInTokens, totalProgressOfInTokens, page, pages, { textDelta: delta }, null);
+                    record = await updateOperationProgress(record, RegisteredOperations.Parse, true, parseProgressInTokens, totalProgressOfInTokens, page, pages, { textDelta: delta }, null);
                     chunkIndex++;
                     pageLengthInTokens += 1;
                     parseProgressInTokens += 1;
@@ -70,10 +69,13 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                     }
                 }
 
+                totalProgressOfInTokens += pageLengthInTokens * 1.5; // we estimate the metadata to be twice as long as the text for metadata
+                totalProgressOfInTokens -= AVERAGE_PAGE_TOKENS; // actualize the estimate
+
                 // Clean up pageText before saving
                 pageText = pageText.replace(/```[a-zA-Z]*\n?|```/g, '');
                 recordText += pageText + '\n\r\n\r';
-                record = await updateParseProgress(record, true, parseProgressInTokens, totalProgressOfInTokens, page, pages, { pageDelta: pageText, recordText: recordText }, null); //saves the record
+                record = await updateOperationProgress(record, RegisteredOperations.Parse, true, parseProgressInTokens, totalProgressOfInTokens, page, pages, { pageDelta: pageText, recordText: recordText }, null); //saves the record
 
                 page++;
             }
@@ -85,7 +87,8 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                     role: 'user',
                     content: prompts.recordParseMetadata({ record, config: configContext, page }),
                 }
-            ]);
+            ], async (resultMessage, result) => {
+            }, parseAIProvider, parseModelName);
 
             let metaDataJson = '';
            // totalProgressOfInTokens *= 1.6; // we estimate the metadata to be twice as long as the text
@@ -95,7 +98,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                     totalProgressOfInTokens = parseProgressInTokens;
                 }
                 metaDataJson += delta;
-                record = await updateParseProgress(record as Record, true, parseProgressInTokens, totalProgressOfInTokens, pages, pages, null, null);
+                record = await updateOperationProgress(record as Record, RegisteredOperations.Parse, true, parseProgressInTokens, totalProgressOfInTokens, pages, pages, null, null);
             }
 
             metaDataJson = metaDataJson.replace(/```[a-zA-Z]*\n?|```/g, '');
@@ -104,7 +107,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             await record.updateChecksumLastParsed();
 
             let updatedRecord = await updateRecordFromText(fullTextToProcess, record, false);
-            updatedRecord = await updateParseProgress(updatedRecord as Record, false, totalProgressOfInTokens, totalProgressOfInTokens, pages, pages, { recordText: fullTextToProcess }, null);
+            updatedRecord = await updateOperationProgress(updatedRecord as Record, RegisteredOperations.Parse, false, totalProgressOfInTokens, totalProgressOfInTokens, pages, pages, { recordText: fullTextToProcess }, null);
 
 
 

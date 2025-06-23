@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { DisplayableDataObject, Record, DataLoadingStatus } from "@/data/client/models";
+import { DisplayableDataObject, Record, DataLoadingStatus, RegisteredOperations } from "@/data/client/models";
 import { useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2, LanguagesIcon, ImageIcon } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
@@ -63,6 +63,39 @@ const MarkdownLinkHandler = ({node, href, children, ...props}: {node?: any; href
   return <a href={href} {...props}>{children}</a>;
 };
 
+// --- OperationProgressBar component ---
+function OperationProgressBar({ operationName, operationProgress }: { operationName: string, operationProgress: any }) {
+  if (!operationProgress || typeof operationProgress.progress !== 'number' || typeof operationProgress.progressOf !== 'number' || operationProgress.progress <= 0 || operationProgress.progressOf <= 0) {
+    return null;
+  }
+  const percent = Math.min(100, Math.round((operationProgress.progress / operationProgress.progressOf) * 100));
+  let label = '';
+  if (operationName === RegisteredOperations.Parse) {
+    label = `Parsed pages: ${operationProgress.page} / ${operationProgress.pages}`;
+  } else if (operationName === RegisteredOperations.Translate) {
+    label = `Translated pages: ${operationProgress.page} / ${operationProgress.pages}`;
+  } else {
+    label = `Operation in progress: ${percent}%`;
+  }
+  return (
+    <div className="w-full mt-2 mb-2">
+      <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-2">
+        <FileText className="w-4 h-4 mr-2" />
+        {label}
+      </div>
+      <div className="h-2 bg-zinc-300 dark:bg-zinc-700 rounded">
+        <div
+          className="h-2 bg-blue-500 rounded"
+          style={{ width: `${percent}%` }}
+        ></div>
+      </div>
+      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
+        {percent}% {operationName === RegisteredOperations.Parse ? 'parsed' : operationName === RegisteredOperations.Translate ? 'translated' : ''}
+      </div>
+    </div>
+  );
+}
+
 export default function RecordItem({ record, displayAttachmentPreviews }: { record: Record, displayAttachmentPreviews: boolean }) {
   // TODO: refactor and extract business logic to a separate files
   const recordContext = useContext(RecordContext)
@@ -82,7 +115,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const [progressDialogOpen, setProgressDialogOpen] = useState(false);
 
   const [displayableAttachments, setDisplayableAttachments] = useState<DisplayableDataObject[]>([]);
-  const parsingProgress = recordContext?.parsingProgressByRecordId[record.id?.toString() || 'unknown'];
+  const parsingProgress = recordContext?.operationProgressByRecordId[record.id?.toString() || 'unknown'];
 
   const loadAttachmentPreviews = async () => {
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
@@ -138,7 +171,7 @@ useEffect(() => {
     }
 
     async function parseRecord() {
-      if (await configContext?.getServerConfig('autoParseRecord') && (record.checksum !== record.checksumLastParsed) && !record.parseInProgress && !record.parseError && (new Date().getTime() - new Date(record.updatedAt).getTime()) < 1000 * 60 * 60 /* parse only records changed up to 1 h */) { // TODO: maybe we need to add "parsedDate" or kind of checksum (better!) to make sure the record is parseed only when something changed
+      if (await configContext?.getServerConfig('autoParseRecord') && (record.checksum !== record.checksumLastParsed) && !record.operationInProgress && !record.operationError && (new Date().getTime() - new Date(record.updatedAt).getTime()) < 1000 * 60 * 60 /* parse only records changed up to 1 h */) { // TODO: maybe we need to add "parsedDate" or kind of checksum (better!) to make sure the record is parseed only when something changed
         console.log('Adding to parse queue due to checksum mismatch ', record.id, record.checksum, record.checksumLastParsed);
         const autoTranslate = await configContext?.getServerConfig('autoTranslateRecord');
         if (autoTranslate) {  // Check for exact string 'true'
@@ -199,8 +232,8 @@ useEffect(() => {
   }, [isTranslating]);
 
   const handleTranslation = async () => {
-    if (record.parseInProgress) {
-      toast.info('Please wait until record is successfully parsed');
+    if (record.operationInProgress) {
+      toast.info('Please wait until record is successfully processed');
       return;
     }
     
@@ -241,35 +274,19 @@ useEffect(() => {
   };
 
   return (
-      record.parseInProgress ? (
+    <>
+      {record.operationInProgress && record.operationName === RegisteredOperations.Parse ? (
         <div className="bg-zinc-100 dark:bg-zinc-800 md:p-4 xs:p-2 md:rounded-md mb-4 xs:mb-2">
           <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
             Record saved succesfully, processing in progress...
           </div>
-          {record.parseProgress && (
-            <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-4">
-              <FileText className="w-4 h-4 mr-2" />
-              Parsed pages: {record.parseProgress.page} / {record.parseProgress.pages}
-            </div>
-          )}
-          {record.parseProgress &&
-            typeof record.parseProgress.progress === 'number' &&
-            typeof record.parseProgress.progressOf === 'number' &&
-            record.parseProgress.progress > 0 &&
-            record.parseProgress.progressOf > 0 && (
-              <div className="w-full mt-2 mb-2">
-                <div className="h-2 bg-zinc-300 dark:bg-zinc-700 rounded">
-                  <div
-                    className="h-2 bg-blue-500 rounded"
-                    style={{ width: `${Math.min(100, Math.round((record.parseProgress.progress / record.parseProgress.progressOf) * 100))}%` }}
-                  ></div>
-                </div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
-                  {Math.round((record.parseProgress.progress / record.parseProgress.progressOf) * 100)}% parsed
-                </div>
-              </div>
+          {/* Show operation progress bar for any operation in progress (parse or translate) */}
+          {record.operationInProgress &&
+            (
+              <OperationProgressBar operationName={record.operationName} operationProgress={record.operationProgress} />
             )
           }
+
           <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
             {record.attachments.map((attachment, index) => (
               <div key={index} className="text-sm inline-flex w-auto"><Button variant="outline" onClick={() => recordContext?.downloadAttachment(attachment.toDTO(), false)}><PaperclipIcon className="w-4 h-4 mr-2" /> {shorten(attachment.displayName)}</Button></div>
@@ -325,7 +342,7 @@ useEffect(() => {
             (record.json) ? (
               <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{record.id}: {labels.recordItemLabel(record.type, { record })}</div>
             ) : (
-              <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{record.parseInProgress ? 'Parsing record in progres...' : 'Record uploaded, no additional data. Maybe try uploading again?' }</div>
+              <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{record.operationInProgress ? 'Parsing record in progres...' : 'Record uploaded, no additional data. Maybe try uploading again?' }</div>
             ) 
           )}
           <div className="text-xs text-zinc-500 dark:text-zinc-400 flex"><CalendarIcon className="w-4 h-4" /> {record.eventDate ? record.eventDate : record.createdAt}</div>
@@ -350,7 +367,7 @@ useEffect(() => {
                       <div className="p-2">
                         {refIds.length === 1 ? (
                           <a href={`#records-${refIds[0]}`} className="text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:underline">
-                            {refRecords[0].record?.id}: {refRecords[0].record?.title || `#${refIds[0]}`}
+                            {refRecords[0].record?.id ? '#' + refRecords[0].record?.id + ':': '#' + refIds[0]} {refRecords[0].record?.title}
                           </a>
                         ) : (
                           <>
@@ -358,7 +375,7 @@ useEffect(() => {
                               {refRecords.map(({ id, record: refRecord }, index: number) => (
                                 <React.Fragment key={id}>
                                   <a href={`#records-${id}`} className="text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:underline">
-                                    {refRecord?.id}: {refRecord?.title || `#${id}`}
+                                    {refRecord? '#' + refRecord?.id + ': ' + refRecord?.title : '#' + id}
                                   </a>
                                   {index < refIds.length - 1 && ', '}
                                 </React.Fragment>
@@ -374,6 +391,13 @@ useEffect(() => {
             </div>
           </div>
         )}
+      {/* Show operation progress bar for any operation in progress (parse or translate) */}
+      {record.operationInProgress &&
+        (
+          <OperationProgressBar operationName={record.operationName} operationProgress={record.operationProgress} />
+        )
+      }
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full text-sm">
           {(record.json || record.extra || record.transcription) ? (
             <TabsList className="grid grid-cols-2 gap-2">
@@ -462,7 +486,7 @@ useEffect(() => {
                         <div className="flex gap-2">
                           <Button size="icon" variant="ghost" title="Edit text" onClick={(e) => {
                             e.stopPropagation(); // Prevent accordion from toggling
-                            if(record.parseInProgress) { 
+                            if(record.operationInProgress) { 
                               toast.info('Please wait until record is successfully parsed') 
                             } else {  
                               recordContext?.setCurrentRecord(record);  
@@ -519,6 +543,7 @@ useEffect(() => {
               </div>
             </TabsContent>
         </Tabs>
+        {/* Restore displayAttachmentPreviews section here, after Tabs and before action buttons */}
         {displayAttachmentPreviews && record.attachments.length > 0 && displayableAttachments && (
           displayableAttachments.length > 0 ? (
             <div className="mt-4 flex-wrap flex items-center justify-left min-h-100 w-full">
@@ -547,17 +572,17 @@ useEffect(() => {
           ) : null
         )}
         <div ref={thisElementRef} className="mt-2 flex items-center gap-2">
-          <Button size="icon" variant="ghost" title="Edit record" onClick={() => { if(record.parseInProgress) { toast.info('Please wait until record is successfully parsed') } else {  recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true); } }}>
+          <Button size="icon" variant="ghost" title="Edit record" onClick={() => { if(record.operationInProgress) { toast.info('Please wait until record is successfully parsed') } else {  recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true); } }}>
             <PencilIcon className="w-4 h-4" />
           </Button>        
-          <Button size="icon" variant="ghost" title="Add attachments" onClick={() => { if(record.parseInProgress) { toast.info('Please wait until record is successfully parsed') } else {   recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true);}  }}>
+          <Button size="icon" variant="ghost" title="Add attachments" onClick={() => { if(record.operationInProgress) { toast.info('Please wait until record is successfully parsed') } else {   recordContext?.setCurrentRecord(record);  recordContext?.setRecordEditMode(true);}  }}>
             <PaperclipIcon className="w-4 h-4" />
           </Button>
           <Button size="icon" variant="ghost" title="Download record as HTML" onClick={() => downloadAsHtml(record.text || record.description, `record-${record.id}`)}>
             <DownloadIcon className="w-4 h-4" />
           </Button>
           <Button size="icon" variant="ghost" title="Parse record" onClick={async () => {
-            if (record.parseInProgress) {
+            if (record.operationInProgress) {
               toast.info('Record parsing already in progress');
               return;
             }
@@ -610,6 +635,7 @@ useEffect(() => {
           ) : null}      
         </div>
       </div>
-    )
+    )}
+    </>
   );
 }

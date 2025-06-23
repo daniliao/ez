@@ -145,7 +145,7 @@ const RecordItemCommands: React.FC<Props> = ({ record, folder, open, setOpen }) 
                  }}><MoveRight /> What are best next steps?</CommandItem> */}
             </CommandGroup>
             <CommandSeparator />
-            {((record.attachments && record.attachments.length > 0 || record.transcription) && !record.parseInProgress) ? (
+            {((record.attachments && record.attachments.length > 0 || record.transcription) && !record.operationInProgress) ? (
                 <CommandGroup heading="Technical">
                     <CommandItem key="cmd-parse" className="text-xs" onSelect={(v) => { recordContext?.parseRecord(record); }}><CogIcon /> Parse record again</CommandItem>
                 </CommandGroup>
@@ -154,7 +154,7 @@ const RecordItemCommands: React.FC<Props> = ({ record, folder, open, setOpen }) 
             <CommandGroup heading="Translations">
                 {supportedLanguages.map((item) => (
                     <CommandItem key={item.code}  onSelect={(v) => {
-                        if (record.parseInProgress) {
+                        if (record.operationInProgress) {
                             toast.info('Please wait until record is successfully parsed');
                             return;
                         }

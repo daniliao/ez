@@ -4,13 +4,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import styles from '@/app/content/[pageName]/page.module.css';
+import { RegisteredOperations } from '@/data/client/models';
 
 export default function ParsingProgressDialog() {
   const recordContext = useContext(RecordContext);
   const open = recordContext?.parsingDialogOpen;
   const setOpen = recordContext?.setParsingDialogOpen;
   const recordId = recordContext?.parsingDialogRecordId;
-  const parsingProgress = recordId ? recordContext?.parsingProgressByRecordId[recordId] : null;
+  const parsingProgress = recordId ? recordContext?.operationProgressByRecordId[recordId] : null;
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -24,13 +25,15 @@ export default function ParsingProgressDialog() {
     ? Math.round((parsingProgress.progress / parsingProgress.progressOf) * 100)
     : 0;
 
+  const isParsing = parsingProgress && parsingProgress.operationName === RegisteredOperations.Parse;
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Parsing Progress</DialogTitle>
         </DialogHeader>
-        {parsingProgress ? (
+        {isParsing ? (
           <>
             <div className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
               Progress:  {parsingProgress.progress <= parsingProgress.progressOf ? parsingProgress.progress : parsingProgress.progressOf} / {parsingProgress.progressOf}

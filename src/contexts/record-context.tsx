@@ -1010,63 +1010,100 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         const parseAIProvider = await config?.getServerConfig('llmProviderParse') as string;
         const parseModelName = await config?.getServerConfig('llmModelParse') as string;
 
-        return new Promise<Record>((resolve, reject) => { // TODO: in case of context errors lets use the page by page translation strategy
-          chatContext?.aiDirectCall([{
+        // Gather all page contents from record.extra
+        const pages: string[] = [];
+        let pageNum = 1;
+        while (true) {
+          const pageContent = await getRecordExtra(record, 'Page ' + pageNum + ' content');
+          if (!pageContent) break;
+          pages.push(pageContent);
+          pageNum++;
+        }
+        if (pages.length === 0 && record.text) {
+          pages.push(record.text);
+        }
+
+        let translatedPages: string[] = [];
+        let progress = 0;
+        setOperationStatus(DataLoadingStatus.Loading);
+        for (let i = 0; i < pages.length; i++) {
+          let translatedPage = '';
+          const stream = chatContext.aiDirectCallStream([
+            {
               id: nanoid(),
               role: 'user',
               createdAt: new Date(),
-              content: prompts.translateRecord({ record, language }),
-          }], async (result) => {
-              if(result) {
-                try {
-                  setOperationStatus(DataLoadingStatus.Loading);
-                  // Create a copy of the original record's attachments
-                  const attachmentsCopy = record.attachments.map(att => att.toDTO());
-                  
-                  const translatedRecord = await updateRecordFromText(result.content, null, true, [
-                    { type: 'Reference record Ids', value: record.id?.toString() || '' },
-                    { type: 'Translation language', value: language },
-                    { type: 'Preserved attachments', value: attachmentsCopy.map(att => att.id).join(', ') }
-                  ]); 
-
-                  if (translatedRecord) {
-                    // Update the translated record with the original attachments and eventDate
-                    translatedRecord.attachments = attachmentsCopy.map(dto => new EncryptedAttachment(dto));
-                    translatedRecord.eventDate = record.eventDate || record.createdAt;
-                    const updatedTranslatedRecord = await updateRecord(translatedRecord);
-
-                    // Create a bi-directional reference by updating the original record
-                    const translationRefsKey = 'Reference record Ids';
-                    const existingTranslationRefs = record.extra?.find(e => e.type === translationRefsKey);
-                    
-                    if (existingTranslationRefs && typeof existingTranslationRefs.value === 'string') {
-                      // If there are existing translations, append the new one
-                      const existingIds = existingTranslationRefs.value.split(',').map(id => id.trim());
-                      if (!existingIds.includes(updatedTranslatedRecord.id?.toString() || '')) {
-                        existingTranslationRefs.value = [...existingIds, updatedTranslatedRecord.id?.toString()].join(', ');
-                        await setRecordExtra(record, translationRefsKey, existingTranslationRefs.value);
-                      }
-                    } else {
-                      // If this is the first translation, create new reference
-                      await setRecordExtra(record, translationRefsKey, updatedTranslatedRecord.id?.toString() || '');
-                    }
-
-                    resolve(updatedTranslatedRecord);
-                  } else {
-                    reject(new Error('Failed to create translated record'));
-                  }
-                } catch (error) {
-                  reject(error);
-                } finally {
-                  setOperationStatus(DataLoadingStatus.Success);
-                }
-              } else {
-                reject(new Error('No translation result received'));
-              }
+              content: prompts.translateRecordText({ record, language, page: i + 1, text: pages[i] }),
             }
-          );
-        });
+          ], undefined, parseAIProvider, parseModelName);
+          for await (const delta of stream) {
+            translatedPage += delta;
+            // Optionally: update progress UI here
+          }
+          translatedPages.push(translatedPage);
+          progress++;
+        }
+        // Join translated pages
+        const translatedText = translatedPages.join('\n\n');
+
+        // Generate metadata for the translated text
+        let metaDataJson = '';
+        const metadataStream = chatContext.aiDirectCallStream([
+          {
+            id: nanoid(),
+            role: 'user',
+            createdAt: new Date(),
+            content: prompts.recordParseMetadata({ record, config, page: pages.length }),
+          }
+        ], undefined, parseAIProvider, parseModelName);
+        for await (const delta of metadataStream) {
+          metaDataJson += delta;
+        }
+        metaDataJson = metaDataJson.replace(/```[a-zA-Z]*\n?|```/g, '');
+        const fullTextToProcess = '```json\n' + metaDataJson + '\n```\n\n```markdown\n' + translatedText + '\n```';
+
+        // Create a copy of the original record's attachments
+        const attachmentsCopy = record.attachments.map(att => att.toDTO());
+        const translatedRecord = await updateRecordFromText(fullTextToProcess, null, true, [
+          { type: 'Reference record Ids', value: record.id?.toString() || '' },
+          { type: 'Translation language', value: language },
+          { type: 'Preserved attachments', value: attachmentsCopy.map(att => att.id).join(', ') }
+        ]);
+
+        if (!translatedRecord) {
+          setOperationStatus(DataLoadingStatus.Error);
+          throw new Error('Failed to create translated record');
+        }
+
+        if (translatedRecord) {
+          // Update the translated record with the original attachments and eventDate
+          translatedRecord.attachments = attachmentsCopy.map(dto => new EncryptedAttachment(dto));
+          translatedRecord.eventDate = record.eventDate || record.createdAt;
+          const updatedTranslatedRecord = await updateRecord(translatedRecord);
+
+          // Create a bi-directional reference by updating the original record
+          const translationRefsKey = 'Reference record Ids';
+          const existingTranslationRefs = record.extra?.find(e => e.type === translationRefsKey);
+          if (existingTranslationRefs && typeof existingTranslationRefs.value === 'string') {
+            // If there are existing translations, append the new one
+            const existingIds = existingTranslationRefs.value.split(',').map(id => id.trim());
+            if (!existingIds.includes(updatedTranslatedRecord.id?.toString() || '')) {
+              existingTranslationRefs.value = [...existingIds, updatedTranslatedRecord.id?.toString()].join(', ');
+              await setRecordExtra(record, translationRefsKey, existingTranslationRefs.value);
+            }
+          } else {
+            // If this is the first translation, create new reference
+            await setRecordExtra(record, translationRefsKey, updatedTranslatedRecord.id?.toString() || '');
+          }
+
+          setOperationStatus(DataLoadingStatus.Success);
+          return updatedTranslatedRecord;
+        } else {
+          setOperationStatus(DataLoadingStatus.Error);
+          throw new Error('Failed to create translated record');
+        }
       } catch (error) {
+        setOperationStatus(DataLoadingStatus.Error);
         console.error('Error translating record:', error);
         toast.error('Error translating record: ' + error);
         throw error;

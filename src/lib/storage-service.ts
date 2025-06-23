@@ -11,7 +11,14 @@ export class StorageService {
     }
 
     getTempDir(): string {
-        return path.join(this.rootPath, 'data', 'temp');
+        return path.join(this.uploadPath, 'temp');
+    }
+
+    clearTempDir(): void {
+        const tempDir = this.getTempDir();
+        if (fs.existsSync(tempDir)) {
+            fs.rmSync(tempDir, { recursive: true });
+        }
     }
 
     public async saveAttachment(file: File, storageKey: string): Promise<void> {

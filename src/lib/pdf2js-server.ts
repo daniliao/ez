@@ -2,7 +2,7 @@
 // with canvas and pdfjs-dist native modules
 
 import { spawn } from 'child_process';
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, readdirSync } from 'fs';
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, readdirSync, rmdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -110,6 +110,7 @@ export async function convertServerSide(
             unlinkSync(imagePath);
           }
           unlinkSync(pdfPath);
+          rmdirSync(outputDir);
 
 
           resolve(images);

@@ -726,7 +726,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             setOperationStatus(DataLoadingStatus.Success);
 
             // Parsing is two or three stage operation: 1. OCR, 2. <optional> sensitive data removal, 3. LLM
-            const ocrProvider = await config?.getServerConfig('ocrProvider') || 'chatgpt';
+            const ocrProvider = await config?.getServerConfig('ocrProvider') || 'llm-aged'; // default LLM provider
             console.log('Using OCR provider:', ocrProvider);
 
             let updatedRecord: Record | null = null;

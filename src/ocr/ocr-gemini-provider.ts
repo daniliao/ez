@@ -6,8 +6,17 @@ import { FolderContextType } from '@/contexts/folder-context';
 import { RecordContextType } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
+import { parseWithAIDirectCall } from './ocr-parse-helper';
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record> {
+export async function parse(
+    record: Record,
+    chatContext: ChatContextType,
+    configContext: ConfigContextType | null,
+    folderContext: FolderContextType | null,
+    updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record | null>,
+    updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => void,
+    sourceImages: DisplayableDataObject[]
+): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const geminiApiKey = await configContext?.getServerConfig('geminiApiKey') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
@@ -17,48 +26,14 @@ export async function parse(record: Record, chatContext: ChatContextType, config
         return Promise.reject('Gemini API key not configured');
     }
 
-    return new Promise(async (resolve, reject) => {
-        try {
-            // Prepare the prompt
-            const prompt = record.transcription ? 
-                prompts.recordParseMultimodalTranscription({ record, config: configContext }) :
-                prompts.recordParseMultimodal({ record, config: configContext });
-
-            // Send to chat context with images
-            chatContext.sendMessage({
-                message: {
-                    role: 'user',
-                    createdAt: new Date(),
-                    type: MessageType.Parse,
-                    content: prompt,
-                    experimental_attachments: sourceImages
-                },
-                onResult: async (resultMessage, result) => {
-                    if (result.finishReason !== 'error') {
-                        if (result.finishReason === 'length') {
-                            toast.error('Too many findings for one record. Try uploading attachments one per record')
-                        }
-
-                        resultMessage.recordRef = record;
-                        updateParseProgress(record, false, 0, 0, null, null);
-                        resultMessage.recordSaved = true;
-                        await record.updateChecksumLastParsed();
-                        const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);
-                        if (updatedRecord) {
-                            resolve(updatedRecord);
-                        } else {
-                            reject(new Error('Failed to update record'));
-                        }
-                    } else {
-                        reject(result);
-                    }
-                },
-                providerName: parseAIProvider,
-                modelName: parseModelName
-            });
-        } catch (error) {
-            console.error('Error in Gemini OCR:', error);
-            reject(error);
-        }
+    return parseWithAIDirectCall({
+        record,
+        chatContext,
+        configContext,
+        updateRecordFromText,
+        updateParseProgress,
+        sourceImages,
+        parseAIProvider,
+        parseModelName
     });
 } 

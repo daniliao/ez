@@ -350,7 +350,7 @@ useEffect(() => {
                       <div className="p-2">
                         {refIds.length === 1 ? (
                           <a href={`#records-${refIds[0]}`} className="text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:underline">
-                            {refRecords[0].record?.id} {refRecords[0].record?.title || `#${refIds[0]}`}
+                            {refRecords[0].record?.id ? '#' + refRecords[0].record?.id + ':': '#' + refIds[0]} {refRecords[0].record?.title}
                           </a>
                         ) : (
                           <>
@@ -358,7 +358,7 @@ useEffect(() => {
                               {refRecords.map(({ id, record: refRecord }, index: number) => (
                                 <React.Fragment key={id}>
                                   <a href={`#records-${id}`} className="text-zinc-500 dark:text-zinc-400 hover:text-blue-500 hover:underline">
-                                    {refRecord? '#' + refRecord?.id : '#' + id} {refRecord?.title || `#${id}`}
+                                    {refRecord? '#' + refRecord?.id + ': ' + refRecord?.title : '#' + id}
                                   </a>
                                   {index < refIds.length - 1 && ', '}
                                 </React.Fragment>

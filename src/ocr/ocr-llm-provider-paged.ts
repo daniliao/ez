@@ -52,8 +52,8 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                         experimental_attachments: [image]                         
                     }
                 ], async (resultMessage, result) => {
-                    totalProgressOfInTokens -= AVERAGE_TOKENS_PER_PAGE;
-                    totalProgressOfInTokens += pageLengthInTokens // adjust the estimaged
+                    //totalProgressOfInTokens -= AVERAGE_TOKENS_PER_PAGE;
+                    //totalProgressOfInTokens += pageLengthInTokens // adjust the estimaged
                 }, parseAIProvider, parseModelName);
                 // parsing page by page
 
@@ -88,7 +88,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             ]);
 
             let metaDataJson = '';
-            totalProgressOfInTokens *= 1.6; // we estimate the metadata to be twice as long as the text
+           // totalProgressOfInTokens *= 1.6; // we estimate the metadata to be twice as long as the text
             for await (const delta of metadataStream) {
                 parseProgressInTokens += 1;
                 if (parseProgressInTokens > totalProgressOfInTokens) {

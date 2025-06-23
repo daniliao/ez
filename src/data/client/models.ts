@@ -202,6 +202,7 @@ export class Record {
       this.checksum = recordSource.checksum ? recordSource.checksum : '';
       this.checksumLastParsed = recordSource.checksumLastParsed ? recordSource.checksumLastParsed : '';
       this.parseInProgress = recordSource.parseInProgress ? recordSource.parseInProgress : false;
+      this.parseProgress = recordSource.parseProgress ? recordSource.parseProgress : null;
 
       
     if(recordSource instanceof Record) {

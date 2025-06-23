@@ -11,8 +11,7 @@ import { EncryptedAttachmentApiClient } from '@/data/client/encrypted-attachment
 import { DatabaseContext } from './db-context';
 import { ChatContext, CreateMessageEx, MessageType, MessageVisibility, OnResultCallback } from './chat-context';
 import { convertDataContentToBase64String } from "ai";
-import { convert } from '@/lib/pdf2js'
-import { pdfjs } from 'react-pdf'
+import { convert } from '@/lib/pdf2js-browser'
 import { prompts } from "@/data/ai/prompts";
 import { parse as chatgptParseRecord } from '@/ocr/ocr-chatgpt-provider';
 import { parse as tesseractParseRecord } from '@/ocr/ocr-tesseract-provider';
@@ -604,7 +603,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               if (statusUpdates) toast.info('Downloading file ' + ea.displayName);
               const pdfBase64Content = await getAttachmentData(ea.toDTO(), AttachmentFormat.dataUrl) as string; // convert to images otherwise it's not supported by vercel ai sdk
               if (statusUpdates) toast.info('Converting file  ' + ea.displayName + ' to images ...');
-                const imagesArray = await convert(pdfBase64Content, { base64: true, image_format: 'image/jpeg', height:  (process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT ? parseFloat(process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT) : 3200)   /*, scale: process.env.NEXT_PUBLIC_PDF_SCALE ? parseFloat(process.env.NEXT_PUBLIC_PDF_SCALE) : 0.9 }*/}, pdfjs)
+                const imagesArray = await convert(pdfBase64Content, { base64: true, image_format: 'image/jpeg', height:  (process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT ? parseFloat(process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT) : 3200)   /*, scale: process.env.NEXT_PUBLIC_PDF_SCALE ? parseFloat(process.env.NEXT_PUBLIC_PDF_SCALE) : 0.9 }*/})
               if (statusUpdates) toast.info('File converted to ' + imagesArray.length + ' images');  
               for (let i = 0; i < imagesArray.length; i++){
                 attachments.push({

@@ -1,3 +1,6 @@
+/*
+ * This module is for Node.js/server-side usage only. Do not use in the browser.
+ */
 
 /*
 
@@ -23,6 +26,9 @@ SOFTWARE.
 
 */
 
+// 2. Importuj WARIANT legacy (UMD)
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
+
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const isURL = require('is-url');
 
@@ -30,6 +36,10 @@ const Canvas = require("canvas");
 const assert = require("assert").strict;
 const util = require('util');
 
+const MAX_CANVAS_PIXELS = 16_777_216;
+
+// Removed pdfjs.GlobalWorkerOptions.workerSrc for Node.js compatibility
+// pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
 
 function NodeCanvasFactory() {}
 NodeCanvasFactory.prototype = {
@@ -62,7 +72,9 @@ NodeCanvasFactory.prototype = {
   },
 };
 
-module.exports.convert = async function (pdf, conversion_config = {}, pdfjs) {
+module.exports.convert = async function (pdf, conversion_config = {}) {
+
+
 
   // Get the PDF in Uint8Array form
 
@@ -97,7 +109,6 @@ module.exports.convert = async function (pdf, conversion_config = {}, pdfjs) {
   // the images (indexed like array[page][pixel])
 
   var outputPages = [];
-  pdfjs.GlobalWorkerOptions.workerSrc = ('https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs');
   var loadingTask = pdfjs.getDocument({data: pdfData, disableFontFace: false, verbosity: 0});
 
   var pdfDocument = await loadingTask.promise
@@ -149,6 +160,7 @@ async function doc_render(pdfDocument, pageNo, canvasFactory, conversion_config)
   // Create a viewport at 100% scale
   let outputScale = conversion_config.scale || 1.5;
   let viewport = page.getViewport({ scale: outputScale });
+  
 
   // Scale it up / down dependent on the sizes given in the config (if there
   // are any)
@@ -158,6 +170,15 @@ async function doc_render(pdfDocument, pageNo, canvasFactory, conversion_config)
     outputScale = conversion_config.height / viewport.height;
   if (outputScale != 1 && outputScale > 0)
     viewport = page.getViewport({ scale: outputScale });
+
+
+  // iOS-fix — przytnij skalę gdy przekroczysz limit Safari
+  const ratio    = (globalThis.devicePixelRatio || 1);
+  const area     = viewport.width * viewport.height * ratio * ratio;
+  if (area > MAX_CANVAS_PIXELS) {
+    outputScale    *= Math.sqrt(MAX_CANVAS_PIXELS / area);
+    viewport  = page.getViewport({ scale: outputScale });
+  }
 
   let canvasAndContext = canvasFactory.create(
     viewport.width,
@@ -170,11 +191,14 @@ async function doc_render(pdfDocument, pageNo, canvasFactory, conversion_config)
     canvasFactory: canvasFactory
   };
 
-  let renderTask = await page.render(renderContext).promise;
+  await page.render(renderContext).promise;
 
   // Convert the canvas to an image buffer.
   console.log(canvasAndContext);
   let image = canvasAndContext.canvas.toDataURL(conversion_config.image_format || 'image/png');
+
+  await page.cleanup();
+  canvasAndContext.canvas.width = canvasAndContext.canvas.height = 0;
 
   return image;
 } // doc_render

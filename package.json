@@ -9,7 +9,8 @@
     "lint": "next lint",
     "generate": "drizzle-kit generate",
     "generate-stats": "drizzle-kit generate --config drizzle.stats.config.ts",
-    "generate-audit": "drizzle-kit generate --config drizzle.audit.config.ts"
+    "generate-audit": "drizzle-kit generate --config drizzle.audit.config.ts",
+    "postinstall": "cp node_modules/pdfjs-dist/build/pdf.worker.mjs public/pdf.worker.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.18",
@@ -43,6 +44,7 @@
     "axios": "^1.7.4",
     "base64-loader": "^1.0.0",
     "better-sqlite3": "^11.0.0",
+    "canvas": "^2.11.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "1.0.0",
@@ -71,6 +73,7 @@
     "node-cache": "^5.1.2",
     "ollama-ai-provider": "^0.12.0",
     "password-validator": "^5.3.0",
+    "pdfjs-dist": "5.3.31",
     "react": "^18.3.1",
     "react-day-picker": "8.10.1",
     "react-dom": "^18",
@@ -118,6 +121,6 @@
     "string-width": "4.2.3"
   },
   "engines": {
-    "node": "20"
+    "node": ">=20"
   }
 }

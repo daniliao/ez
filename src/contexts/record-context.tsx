@@ -661,7 +661,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
         if (progress > 0 && progressOf > 0) {
 
-          record.parseProgress = {
+          record.operationProgress = {
             page: page,
             pages: pages,
             progress: progress,

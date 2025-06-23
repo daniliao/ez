@@ -158,7 +158,7 @@ export type RecordItem = z.infer<typeof recordItemSchema>;
 
 export type PostParseCallback = (record: Record) => Promise<void>;
 
-export type ParseProgress = {
+export type OperationProgress = {
     page: number;
     pages: number;
     progress: number;
@@ -188,7 +188,7 @@ export class Record {
 
     parseInProgress: boolean = false;
     parseError: any = null;
-    parseProgress?: ParseProgress;
+    operationProgress?: OperationProgress;
     postParseCallback?: PostParseCallback;
   
     constructor(recordSource: RecordDTO | Record) {
@@ -202,7 +202,7 @@ export class Record {
       this.checksum = recordSource.checksum ? recordSource.checksum : '';
       this.checksumLastParsed = recordSource.checksumLastParsed ? recordSource.checksumLastParsed : '';
       this.parseInProgress = recordSource.parseInProgress ? recordSource.parseInProgress : false;
-      this.parseProgress = recordSource.parseProgress ? recordSource.parseProgress : null;
+      this.operationProgress = recordSource.operationProgress ? recordSource.operationProgress : null;
       
 
       

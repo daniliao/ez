@@ -89,7 +89,7 @@ export const recordDTOSchema = z.object({
   createdAt: z.string().default(() => getCurrentTS()),
   updatedAt: z.string().default(() => getCurrentTS()),
 
-  parseProgress: z.object({
+  operationProgress: z.object({
     page: z.number().positive().int(),
     pages: z.number().positive().int(),
     progress: z.number().positive().int(),

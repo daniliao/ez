@@ -246,26 +246,26 @@ useEffect(() => {
           <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
             Record saved succesfully, processing in progress...
           </div>
-          {record.parseProgress && (
+          {record.operationProgress && (
             <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-4">
               <FileText className="w-4 h-4 mr-2" />
-              Parsed pages: {record.parseProgress.page} / {record.parseProgress.pages}
+              Parsed pages: {record.operationProgress.page} / {record.operationProgress.pages}
             </div>
           )}
-          {record.parseProgress &&
-            typeof record.parseProgress.progress === 'number' &&
-            typeof record.parseProgress.progressOf === 'number' &&
-            record.parseProgress.progress > 0 &&
-            record.parseProgress.progressOf > 0 && (
+          {record.operationProgress &&
+            typeof record.operationProgress.progress === 'number' &&
+            typeof record.operationProgress.progressOf === 'number' &&
+            record.operationProgress.progress > 0 &&
+            record.operationProgress.progressOf > 0 && (
               <div className="w-full mt-2 mb-2">
                 <div className="h-2 bg-zinc-300 dark:bg-zinc-700 rounded">
                   <div
                     className="h-2 bg-blue-500 rounded"
-                    style={{ width: `${Math.min(100, Math.round((record.parseProgress.progress / record.parseProgress.progressOf) * 100))}%` }}
+                    style={{ width: `${Math.min(100, Math.round((record.operationProgress.progress / record.operationProgress.progressOf) * 100))}%` }}
                   ></div>
                 </div>
                 <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
-                  {Math.round((record.parseProgress.progress / record.parseProgress.progressOf) * 100)}% parsed
+                  {Math.round((record.operationProgress.progress / record.operationProgress.progressOf) * 100)}% parsed
                 </div>
               </div>
             )

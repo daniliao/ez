@@ -1,4 +1,4 @@
-import { DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record, RegisteredOperations } from '@/data/client/models';
+import { AVERAGE_PAGE_TOKENS, DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record, RegisteredOperations } from '@/data/client/models';
 import { findCodeBlocks } from "@/lib/utils";
 import { AIResultEventType, ChatContextType, MessageType, MessageVisibility } from '@/contexts/chat-context';
 import { ConfigContextType } from '@/contexts/config-context';
@@ -7,15 +7,14 @@ import { getRecordExtra } from '@/contexts/record-context';
 import { prompts } from '@/data/ai/prompts';
 import { toast } from 'sonner';
 
-const AVERAGE_TOKENS_PER_PAGE = 1400;
 
 export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateOperationProgress: (record: Record, operationName: string, inProgress: boolean, progress: number, progressOf: number, page: number, pages: number, metadata: any, error: any) => Promise<Record>, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
 
     const parseProgressInPages = parseInt(await getRecordExtra(record, 'Document parsed pages') as string || '0');
-    let parseProgressInTokens = parseProgressInPages * AVERAGE_TOKENS_PER_PAGE;
-    let totalProgressOfInTokens = sourceImages.length * AVERAGE_TOKENS_PER_PAGE;
+    let parseProgressInTokens = parseProgressInPages * AVERAGE_PAGE_TOKENS;
+    let totalProgressOfInTokens = sourceImages.length * AVERAGE_PAGE_TOKENS;
 
     return new Promise(async (resolve, reject) => {
         try {
@@ -71,7 +70,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                 }
 
                 totalProgressOfInTokens += pageLengthInTokens * 1.5; // we estimate the metadata to be twice as long as the text for metadata
-                totalProgressOfInTokens -= AVERAGE_TOKENS_PER_PAGE; // actualize the estimate
+                totalProgressOfInTokens -= AVERAGE_PAGE_TOKENS; // actualize the estimate
 
                 // Clean up pageText before saving
                 pageText = pageText.replace(/```[a-zA-Z]*\n?|```/g, '');

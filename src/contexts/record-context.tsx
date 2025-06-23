@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect, useContext, PropsWithChildre
 import { EncryptedAttachmentDTO, EncryptedAttachmentDTOEncSettings, RecordDTO } from '@/data/dto';
 import { RecordApiClient } from '@/data/client/record-api-client';
 import { ApiEncryptionConfig } from '@/data/client/base-api-client';
-import { DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record, PostParseCallback, RegisteredOperations } from '@/data/client/models';
+import { DataLoadingStatus, DisplayableDataObject, EncryptedAttachment, Folder, Record, PostParseCallback, RegisteredOperations, AVERAGE_PAGE_TOKENS } from '@/data/client/models';
 import { ConfigContext, ConfigContextType } from '@/contexts/config-context';
 import { toast } from 'sonner';
 import { sort } from 'fast-sort';
@@ -34,6 +34,7 @@ import { AuditContext } from './audit-context';
 import { SaaSContext } from './saas-context';
 import { nanoid } from 'nanoid';
 import { parse as chatgptPagedParseRecord } from '@/ocr/ocr-llm-provider-paged';
+
 
 // Add the helper function before the parseQueueInProgress variable
 const discoverEventDate = (record: Record): string => {
@@ -143,8 +144,9 @@ export type RecordContextType = {
     setRecordExtra: (record: Record, type: string, value: string) => Promise<Record>;
     removeRecordExtra: (record: Record, type: string) => Promise<void>;
     translateRecord: (record: Record, language?: string) => Promise<Record>;
-    parsingProgressByRecordId: {
+    operationProgressByRecordId: {
       [recordId: string]: {
+        operationName: string;
         progress: number;
         progressOf: number;
         page: number;
@@ -153,7 +155,7 @@ export type RecordContextType = {
         textDelta: string;
         pageDelta: string;
         recordText?: string;
-        history: { progress: number; progressOf: number; page: number; pages: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
+        history: { operationName: string; progress: number; progressOf: number; page: number; pages: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
       }
     };
     parsingDialogOpen: boolean;
@@ -176,8 +178,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     const [filterSelectedTags, setFilterSelectedTags] = useState<string[]>([]);
     const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
     const [sortBy, setSortBy] = useState<string>('eventDate desc');
-    const [parsingProgressByRecordId, setParsingProgressByRecordId] = useState<{
+    const [operationProgressByRecordId, setOperationProgressByRecordId] = useState<{
       [recordId: string]: {
+        operationName: string;
         page: number;
         pages: number;
         progress: number;
@@ -186,7 +189,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         textDelta: string;
         pageDelta: string;
         recordText?: string;
-        history: { progress: number; progressOf: number; page: number; pages: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
+        history: { operationName: string; progress: number; progressOf: number; page: number; pages: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
       }
     }>({});
     const [parsingDialogOpen, setParsingDialogOpen] = useState(false);
@@ -663,6 +666,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         if (progress > 0 && progressOf > 0) {
 
           record.operationProgress = {
+            operationName: operation,
             page: page,
             pages: pages,
             progress: progress,
@@ -685,14 +689,15 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
   
             record = await updateRecord(record);
           }
-  
+            
           // Save parsing progress in context state
-          setParsingProgressByRecordId(prev => {
+          setOperationProgressByRecordId(prev => {
             const id = record.id?.toString() || 'unknown';
             const prevHistory = prev[id]?.history || [];
             return {
               ...prev,
               [id]: {
+                operationName: operation,
                 progress,
                 progressOf,
                 page,
@@ -703,7 +708,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 recordText: metadata?.recordText || '',
                 history: [
                   ...prevHistory,
-                  { progress, progressOf, metadata, page, pages, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
+                  { operationName: operation, progress, progressOf, metadata, page, pages, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
                 ]
               }
             };
@@ -1024,11 +1029,15 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           pages.push(record.text);
         }
 
-
         let translatedPages: string[] = [];
         let progress = 0;
         setOperationStatus(DataLoadingStatus.Loading);
+        // --- Translation progress bar support ---
+        record = await updateOperationProgress(record, RegisteredOperations.Translate, true, 0, pages.length, 0, pages.length, null, null);
         // Prepare a placeholder for the translated record (will be created after all pages are translated)
+        let pagesTokensProcessed = 0;
+        let totalPagesTokens = AVERAGE_PAGE_TOKENS * pages.length;
+
         for (let i = 0; i < pages.length; i++) {
           let translatedPage = '';
           const stream = chatContext.aiDirectCallStream([
@@ -1039,12 +1048,20 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               content: prompts.translateRecordTextByPage({ record, language, page: i + 1, pageContent: pages[i] }),
             }
           ], undefined, parseAIProvider, parseModelName);
+          let pageTokens = 0;
           for await (const delta of stream) {
             translatedPage += delta;
-            // Optionally: update progress UI here
+            pageTokens += 1;
+            pagesTokensProcessed += 1;
+            // Update translation progress UI here
+            record = await updateOperationProgress(record, RegisteredOperations.Translate, true, pagesTokensProcessed, totalPagesTokens, i + 1, pages.length, { textDelta: delta }, null);
           }
           translatedPages.push(translatedPage);
-          progress++;
+          // Update after each page is finished
+
+          totalPagesTokens -=AVERAGE_PAGE_TOKENS;
+          totalPagesTokens += pageTokens * 1.7; // we estimate the metadata to be twice as long as the text for metadata
+          record = await updateOperationProgress(record, RegisteredOperations.Translate, true, pagesTokensProcessed, totalPagesTokens, i + 1, pages.length, { pageDelta: translatedPage }, null);
         }
         // Join translated pages
         const translatedText = translatedPages.join('\n\n');
@@ -1062,6 +1079,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         
         for await (const delta of metadataStream) {
           metaDataJson += delta;
+          record = await updateOperationProgress(record, RegisteredOperations.Translate, true, pagesTokensProcessed, totalPagesTokens, pages.length, pages.length, { textDelta: delta }, null);
         }
         metaDataJson = metaDataJson.replace(/```[a-zA-Z]*\n?|```/g, '');
         const fullTextToProcess = '```json\n' + metaDataJson + '\n```\n\n```markdown\n' + translatedText + '\n```';
@@ -1076,6 +1094,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
         if (!translatedRecord) {
           setOperationStatus(DataLoadingStatus.Error);
+          // End translation progress
+          record = await updateOperationProgress(record, RegisteredOperations.Translate, false, pagesTokensProcessed, pagesTokensProcessed, pages.length, pages.length, null, 'Failed to create translated record');
           throw new Error('Failed to create translated record');
         }
 
@@ -1108,10 +1128,14 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         translatedRecord = await updateRecord(translatedRecord); // save changes to translated record
 
         setOperationStatus(DataLoadingStatus.Success);
+        // End translation progress
+        await updateOperationProgress(record, RegisteredOperations.Translate, false, pagesTokensProcessed, pagesTokensProcessed, pages.length, pages.length, null, null);
         return translatedRecord;
 
       } catch (error) {
         setOperationStatus(DataLoadingStatus.Error);
+        // End translation progress with error
+        await updateOperationProgress(record, RegisteredOperations.Translate, false, 0, 0, 0, 0, null, error);
         console.error('Error translating record:', error);
         toast.error('Error translating record: ' + error);
         throw error;
@@ -1158,8 +1182,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                  setRecordDialogOpen,
                  setRecordExtra,
                  removeRecordExtra,
+                 setOperationProgressByRecordId,
                  translateRecord,
-                 parsingProgressByRecordId,
+                 operationProgressByRecordId,
                  parsingDialogOpen,
                  setParsingDialogOpen,
                  parsingDialogRecordId,

@@ -9,6 +9,8 @@ export enum RegisteredOperations {
     Parse = 'parse',
     Translate = 'translate'
 }
+
+export const AVERAGE_PAGE_TOKENS = 1000;
  
 
 
@@ -167,6 +169,7 @@ export type PostParseCallback = (record: Record) => Promise<void>;
 export type OperationProgress = {
     page: number;
     pages: number;
+    operationName: string;
     progress: number;
     progressOf: number;
     textDelta?: string;

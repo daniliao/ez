@@ -63,6 +63,39 @@ const MarkdownLinkHandler = ({node, href, children, ...props}: {node?: any; href
   return <a href={href} {...props}>{children}</a>;
 };
 
+// --- OperationProgressBar component ---
+function OperationProgressBar({ operationName, operationProgress }: { operationName: string, operationProgress: any }) {
+  if (!operationProgress || typeof operationProgress.progress !== 'number' || typeof operationProgress.progressOf !== 'number' || operationProgress.progress <= 0 || operationProgress.progressOf <= 0) {
+    return null;
+  }
+  const percent = Math.min(100, Math.round((operationProgress.progress / operationProgress.progressOf) * 100));
+  let label = '';
+  if (operationName === RegisteredOperations.Parse) {
+    label = `Parsed pages: ${operationProgress.page} / ${operationProgress.pages}`;
+  } else if (operationName === RegisteredOperations.Translate) {
+    label = `Translated pages: ${operationProgress.page} / ${operationProgress.pages}`;
+  } else {
+    label = `Operation in progress: ${percent}%`;
+  }
+  return (
+    <div className="w-full mt-2 mb-2">
+      <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-2">
+        <FileText className="w-4 h-4 mr-2" />
+        {label}
+      </div>
+      <div className="h-2 bg-zinc-300 dark:bg-zinc-700 rounded">
+        <div
+          className="h-2 bg-blue-500 rounded"
+          style={{ width: `${percent}%` }}
+        ></div>
+      </div>
+      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
+        {percent}% {operationName === RegisteredOperations.Parse ? 'parsed' : operationName === RegisteredOperations.Translate ? 'translated' : ''}
+      </div>
+    </div>
+  );
+}
+
 export default function RecordItem({ record, displayAttachmentPreviews }: { record: Record, displayAttachmentPreviews: boolean }) {
   // TODO: refactor and extract business logic to a separate files
   const recordContext = useContext(RecordContext)
@@ -82,7 +115,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const [progressDialogOpen, setProgressDialogOpen] = useState(false);
 
   const [displayableAttachments, setDisplayableAttachments] = useState<DisplayableDataObject[]>([]);
-  const parsingProgress = recordContext?.parsingProgressByRecordId[record.id?.toString() || 'unknown'];
+  const parsingProgress = recordContext?.operationProgressByRecordId[record.id?.toString() || 'unknown'];
 
   const loadAttachmentPreviews = async () => {
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
@@ -241,35 +274,19 @@ useEffect(() => {
   };
 
   return (
-      record.operationInProgress && record.operationName === RegisteredOperations.Parse ? (
+    <>
+      {record.operationInProgress && record.operationName === RegisteredOperations.Parse ? (
         <div className="bg-zinc-100 dark:bg-zinc-800 md:p-4 xs:p-2 md:rounded-md mb-4 xs:mb-2">
           <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
             Record saved succesfully, processing in progress...
           </div>
-          {record.operationProgress && (
-            <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-4">
-              <FileText className="w-4 h-4 mr-2" />
-              Parsed pages: {record.operationProgress.page} / {record.operationProgress.pages}
-            </div>
-          )}
-          {record.operationProgress &&
-            typeof record.operationProgress.progress === 'number' &&
-            typeof record.operationProgress.progressOf === 'number' &&
-            record.operationProgress.progress > 0 &&
-            record.operationProgress.progressOf > 0 && (
-              <div className="w-full mt-2 mb-2">
-                <div className="h-2 bg-zinc-300 dark:bg-zinc-700 rounded">
-                  <div
-                    className="h-2 bg-blue-500 rounded"
-                    style={{ width: `${Math.min(100, Math.round((record.operationProgress.progress / record.operationProgress.progressOf) * 100))}%` }}
-                  ></div>
-                </div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
-                  {Math.round((record.operationProgress.progress / record.operationProgress.progressOf) * 100)}% parsed
-                </div>
-              </div>
+          {/* Show operation progress bar for any operation in progress (parse or translate) */}
+          {record.operationInProgress &&
+            (
+              <OperationProgressBar operationName={record.operationName} operationProgress={record.operationProgress} />
             )
           }
+
           <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
             {record.attachments.map((attachment, index) => (
               <div key={index} className="text-sm inline-flex w-auto"><Button variant="outline" onClick={() => recordContext?.downloadAttachment(attachment.toDTO(), false)}><PaperclipIcon className="w-4 h-4 mr-2" /> {shorten(attachment.displayName)}</Button></div>
@@ -374,6 +391,13 @@ useEffect(() => {
             </div>
           </div>
         )}
+      {/* Show operation progress bar for any operation in progress (parse or translate) */}
+      {record.operationInProgress &&
+        (
+          <OperationProgressBar operationName={record.operationName} operationProgress={record.operationProgress} />
+        )
+      }
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full text-sm">
           {(record.json || record.extra || record.transcription) ? (
             <TabsList className="grid grid-cols-2 gap-2">
@@ -519,6 +543,7 @@ useEffect(() => {
               </div>
             </TabsContent>
         </Tabs>
+        {/* Restore displayAttachmentPreviews section here, after Tabs and before action buttons */}
         {displayAttachmentPreviews && record.attachments.length > 0 && displayableAttachments && (
           displayableAttachments.length > 0 ? (
             <div className="mt-4 flex-wrap flex items-center justify-left min-h-100 w-full">
@@ -610,6 +635,7 @@ useEffect(() => {
           ) : null}      
         </div>
       </div>
-    )
+    )}
+    </>
   );
 }

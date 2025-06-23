@@ -1,4 +1,4 @@
-import { DisplayableDataObject, Record, RegisteredOperations } from '@/data/client/models';
+import { AVERAGE_PAGE_TOKENS, DisplayableDataObject, Record, RegisteredOperations } from '@/data/client/models';
 import { ChatContextType, MessageType } from '@/contexts/chat-context';
 import { ConfigContextType } from '@/contexts/config-context';
 import { prompts } from '@/data/ai/prompts';
@@ -16,7 +16,6 @@ interface ParseWithAIDirectCallParams {
     parseModelName: string;
 }
 
-const AVERAGE_TOKENS_PER_PAGE = 1400;
 
 export async function parseWithAIDirectCall({
     record,
@@ -31,7 +30,7 @@ export async function parseWithAIDirectCall({
     let chunkIndex = 0;
     return new Promise(async (resolve, reject) => {
         try {
-            let totalTokensEstimage = sourceImages.length * AVERAGE_TOKENS_PER_PAGE;
+            let totalTokensEstimage = sourceImages.length * AVERAGE_PAGE_TOKENS
             // Prepare the prompt
             const prompt = record.transcription
                 ? prompts.recordParseMultimodalTranscription({ record, config: configContext })

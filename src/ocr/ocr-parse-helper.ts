@@ -10,11 +10,13 @@ interface ParseWithAIDirectCallParams {
     chatContext: ChatContextType;
     configContext: ConfigContextType | null;
     updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record | null>;
-    updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => void;
+    updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => Promise<Record>;
     sourceImages: DisplayableDataObject[];
     parseAIProvider: string;
     parseModelName: string;
 }
+
+const AVERAGE_TOKENS_PER_PAGE = 1400;
 
 export async function parseWithAIDirectCall({
     record,
@@ -29,6 +31,7 @@ export async function parseWithAIDirectCall({
     let chunkIndex = 0;
     return new Promise(async (resolve, reject) => {
         try {
+            let totalTokensEstimage = sourceImages.length * AVERAGE_TOKENS_PER_PAGE;
             // Prepare the prompt
             const prompt = record.transcription
                 ? prompts.recordParseMultimodalTranscription({ record, config: configContext })
@@ -36,7 +39,7 @@ export async function parseWithAIDirectCall({
 
             let content = '';
             let error: any = null;
-            updateParseProgress(record, true, 0, 0, null, null);
+            record = await updateParseProgress(record, true, 0, 0, null, null);
 
             const stream = chatContext.aiDirectCallStream([
                 {
@@ -47,16 +50,18 @@ export async function parseWithAIDirectCall({
                     content: prompt,
                     experimental_attachments: sourceImages,
                 }
-            ], undefined, parseAIProvider, parseModelName);
+            ], async (resultMessage, result) => {
+                totalTokensEstimage = chunkIndex;
+            }, parseAIProvider, parseModelName);
 
             for await (const delta of stream) {
                 content += delta;
                 chunkIndex++;
-                updateParseProgress(record, true, chunkIndex, 0, { textDelta: delta, accumulated: content }, null);
+                record = await updateParseProgress(record, true, chunkIndex, totalTokensEstimage, { textDelta: delta, accumulated: content }, null);
             }
 
             // After streaming is done
-            updateParseProgress(record, false, chunkIndex, 0, { accumulated: content }, null);
+            record = await updateParseProgress(record, false, chunkIndex, totalTokensEstimage, { recordText: content, pageDelta: content }, null);
             await record.updateChecksumLastParsed();
             const updatedRecord = await updateRecordFromText(content, record, false);
             if (updatedRecord) {

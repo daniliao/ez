@@ -9,21 +9,23 @@ import { toast } from 'sonner';
 
 const AVERAGE_TOKENS_PER_PAGE = 1200;
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => Promise<Record>, sourceImages: DisplayableDataObject[]): Promise<Record> {
+export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, page: number, pages: number, metadata: any, error: any) => Promise<Record>, sourceImages: DisplayableDataObject[]): Promise<Record> {
     const parseAIProvider = await configContext?.getServerConfig('llmProviderParse') as string;
     const parseModelName = await configContext?.getServerConfig('llmModelParse') as string;
 
-    const parseProgress = parseInt(await getRecordExtra(record, 'Document parsed pages') as string || '0');
+    const parseProgressInPages = parseInt(await getRecordExtra(record, 'Document parsed pages') as string || '0');
+    let parseProgressInTokens = parseProgressInPages * AVERAGE_TOKENS_PER_PAGE;
+    let totalProgressOfInTokens = sourceImages.length * AVERAGE_TOKENS_PER_PAGE;
 
     return new Promise(async (resolve, reject) => {
         try {
             // Prepare the prompt
 
-            let page = parseProgress + 1;
+            let page = parseProgressInPages + 1;
             
             let recordText = '';
 
-            record = await updateParseProgress(record, true, 0, 0, null, null); // set in progress
+            record = await updateParseProgress(record, true, 0, 0, 0, 0, null, null); // set in progress
 
 
             for (let pageAcc = 1; pageAcc <= page; pageAcc++) {
@@ -34,7 +36,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             }
             
             
-            for (const image of sourceImages.slice(parseProgress)) {
+            for (const image of sourceImages.slice(parseProgressInPages)) {
                 let pageText = '';
                 const prompt = prompts.recordParseSinglePage({ record, config: configContext, page }); // TODO: add transcription if exists
 
@@ -54,14 +56,14 @@ export async function parse(record: Record, chatContext: ChatContextType, config
                 let chunkIndex = 0;
                 for await (const delta of stream) { 
                     pageText += delta;
-                    record = await updateParseProgress(record, true, page * AVERAGE_TOKENS_PER_PAGE + chunkIndex, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, { textDelta: delta }, null);
+                    record = await updateParseProgress(record, true, parseProgressInTokens, totalProgressOfInTokens, page, sourceImages.length, { textDelta: delta }, null);
                     chunkIndex++;
                 }
 
                 // Clean up pageText before saving
                 pageText = pageText.replace(/```[a-zA-Z]*\n?|```/g, '');
                 recordText += pageText + '\n\r\n\r';
-                record = await updateParseProgress(record, true, page * AVERAGE_TOKENS_PER_PAGE, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, { pageDelta: pageText, recordText: recordText }, null); //saves the record
+                record = await updateParseProgress(record, true, parseProgressInTokens, totalProgressOfInTokens, page, sourceImages.length, { pageDelta: pageText, recordText: recordText }, null); //saves the record
 
                 page++;
             }
@@ -78,7 +80,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             let metaDataJson = '';
             for await (const delta of metadataStream) {
                 metaDataJson += delta;
-                record = await updateParseProgress(record as Record, true, 0, 0, null, null);
+                record = await updateParseProgress(record as Record, true, 0, 0, 0, 0, null, null);
             }
 
             metaDataJson = metaDataJson.replace(/```[a-zA-Z]*\n?|```/g, '');
@@ -87,7 +89,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             await record.updateChecksumLastParsed();
 
             let updatedRecord = await updateRecordFromText(fullTextToProcess, record, false);
-            updatedRecord = await updateParseProgress(updatedRecord as Record, false, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, { recordText: fullTextToProcess }, null);
+            updatedRecord = await updateParseProgress(updatedRecord as Record, false, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, sourceImages.length * AVERAGE_TOKENS_PER_PAGE, sourceImages.length, sourceImages.length, { recordText: fullTextToProcess }, null);
 
 
 

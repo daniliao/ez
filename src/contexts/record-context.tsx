@@ -753,7 +753,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             } catch (error) {
               console.error('Error processing record:', error);
               toast.error('Error processing record: ' + error);
-              if (currentRecord) updateParseProgress(currentRecord, false, error);
+              if (currentRecord) updateParseProgress(currentRecord, false, 0, 0, 0, 0, null, error);
             }
 
             console.log('Record parsed, taking next record', currentRecord);
@@ -763,7 +763,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             parseQueue = parseQueue.slice(1); // remove one item
             parseQueueLength = parseQueue.length;
 
-            if (currentRecord) updateParseProgress(currentRecord, false, error);
+            if (currentRecord) updateParseProgress(currentRecord, false, 0, 0, 0, 0, null, error);
           }
         }
         parseQueueInProgress = false;

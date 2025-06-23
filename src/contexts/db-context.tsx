@@ -246,7 +246,6 @@ export const DatabaseContextProvider: React.FC<PropsWithChildren> = ({ children 
         
         if (authChallengResponse.status === 200){ // authorization challenge success
             const keyHashParams = authChallengResponse.data as KeyHashParamsDTO;
-            console.log(authChallengResponse);
 
             const keyHash = await argon2.hash({
                 pass: authorizeRequest.key,

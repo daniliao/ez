@@ -1007,6 +1007,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
     const translateRecord = async (record: Record, language: string = 'English') => {
       try {
+        const parseAIProvider = await config?.getServerConfig('llmProviderParse') as string;
+        const parseModelName = await config?.getServerConfig('llmModelParse') as string;
+
         return new Promise<Record>((resolve, reject) => {
           chatContext?.aiDirectCall([{
               id: nanoid(),

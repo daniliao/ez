@@ -278,7 +278,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               }
 
             // Check for language in extra field and add corresponding tag
-            const languageExtra = record.extra?.find(e => e.type === 'Translation language')?.value;
+            const languageExtra = record.extra?.find(e => e.type === 'Translation language')?.value || record.json?.find(e => e.language)?.language;
             if (languageExtra && typeof languageExtra === 'string') {
                 const languageTag = `Language: ${languageExtra}`;
                 if (!record.tags) {

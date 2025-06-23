@@ -349,7 +349,7 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
                 role: 'assistant',
                 visibility: MessageVisibility.Visible
             }            
-            setIsCrossChecking(true);
+            setIsCrossChecking(false);
             const result = await streamText({
                 model: await aiProvider(providerName, modelName),
                 messages: convertToCoreMessages(messagesToSend),

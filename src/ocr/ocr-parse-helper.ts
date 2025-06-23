@@ -26,6 +26,7 @@ export async function parseWithAIDirectCall({
     parseAIProvider,
     parseModelName
 }: ParseWithAIDirectCallParams): Promise<Record> {
+    let chunkIndex = 0;
     return new Promise(async (resolve, reject) => {
         try {
             // Prepare the prompt
@@ -34,11 +35,10 @@ export async function parseWithAIDirectCall({
                 : prompts.recordParseMultimodal({ record, config: configContext });
 
             let content = '';
-            let chunkIndex = 0;
             let error: any = null;
             updateParseProgress(record, true, 0, 0, null, null);
 
-            await chatContext.aiDirectCall([
+            const stream = chatContext.aiDirectCallStream([
                 {
                     id: nanoid(),
                     role: 'user',
@@ -47,29 +47,25 @@ export async function parseWithAIDirectCall({
                     content: prompt,
                     experimental_attachments: sourceImages,
                 }
-            ], async (resultMessage, result) => {
-                if (result.finishReason !== 'error') {
-                    if (result.finishReason === 'length') {
-                        toast.error('Too many findings for one record. Try uploading attachments one per record');
-                    }
-                    resultMessage.recordRef = record;
-                    resultMessage.recordSaved = true;
-                    await record.updateChecksumLastParsed();
-                    updateParseProgress(record, false, chunkIndex, 1, null, null);
-                    const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);
-                    if (updatedRecord) {
-                        resolve(updatedRecord);
-                    } else {
-                        reject(new Error('Failed to update record'));
-                    }
-                } else {
-                    error = result;
-                    updateParseProgress(record, false, chunkIndex, 1, null, error);
-                    reject(result);
-                }
-            }, parseAIProvider, parseModelName);
+            ], undefined, parseAIProvider, parseModelName);
+
+            for await (const delta of stream) {
+                content += delta;
+                chunkIndex++;
+                updateParseProgress(record, true, chunkIndex, 0, { textDelta: delta, accumulated: content }, null);
+            }
+
+            // After streaming is done
+            updateParseProgress(record, false, chunkIndex, 0, { accumulated: content }, null);
+            await record.updateChecksumLastParsed();
+            const updatedRecord = await updateRecordFromText(content, record, false);
+            if (updatedRecord) {
+                resolve(updatedRecord);
+            } else {
+                reject(new Error('Failed to update record'));
+            }
         } catch (err) {
-            updateParseProgress(record, false, 0, 0, null, err);
+            updateParseProgress(record, false, chunkIndex, 0, null, err);
             reject(err);
         }
     });

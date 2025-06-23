@@ -33,7 +33,7 @@ import { diff, addedDiff, deletedDiff, updatedDiff, detailedDiff } from 'deep-ob
 import { AuditContext } from './audit-context';
 import { SaaSContext } from './saas-context';
 import { nanoid } from 'nanoid';
-import { parse as chatgptPagedParseRecord } from '@/ocr/ocr-chatgpt-provider-paged';
+import { parse as chatgptPagedParseRecord } from '@/ocr/ocr-llm-provider-paged';
 
 // Add the helper function before the parseQueueInProgress variable
 const discoverEventDate = (record: Record): string => {
@@ -147,11 +147,13 @@ export type RecordContextType = {
       [recordId: string]: {
         progress: number;
         progressOf: number;
+        page: number;
+        pages: number;
         metadata: any;
         textDelta: string;
         pageDelta: string;
         recordText?: string;
-        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
+        history: { progress: number; progressOf: number; page: number; pages: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
       }
     };
     parsingDialogOpen: boolean;
@@ -176,13 +178,15 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     const [sortBy, setSortBy] = useState<string>('eventDate desc');
     const [parsingProgressByRecordId, setParsingProgressByRecordId] = useState<{
       [recordId: string]: {
+        page: number;
+        pages: number;
         progress: number;
         progressOf: number;
         metadata: any;
         textDelta: string;
         pageDelta: string;
         recordText?: string;
-        history: { progress: number; progressOf: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
+        history: { progress: number; progressOf: number; page: number; pages: number; metadata: any; textDelta: string; pageDelta: string; recordText?: string; timestamp: number }[];
       }
     }>({});
     const [parsingDialogOpen, setParsingDialogOpen] = useState(false);
@@ -645,7 +649,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           })
       }
     
-      const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, metadata: any = null, error: any = null) : Promise<Record> => {
+      const updateParseProgress = async (record: Record, inProgress: boolean, progress: number = 0, progressOf: number = 0, page: number = 0, pages: number = 0, metadata: any = null, error: any = null) : Promise<Record> => {
 
 
         record.parseInProgress = inProgress;
@@ -658,8 +662,10 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         if (progress > 0 && progressOf > 0) {
 
           record.parseProgress = {
-            page: progress,
-            total: progressOf,
+            page: page,
+            pages: pages,
+            progress: progress,
+            progressOf: progressOf,
             textDelta: metadata?.textDelta,
             pageDelta: metadata?.pageDelta,
             recordText: metadata?.recordText
@@ -667,13 +673,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
           if (metadata && metadata.pageDelta && metadata.recordText) { // new page parsed
             record.text = metadata.recordText;
-            record = await setRecordExtra(record, 'Page ' + progress.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
+            record = await setRecordExtra(record, 'Page ' + page.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
 
             if (progress === (progressOf - 1)) {
               removeRecordExtra(record, 'Document parsed pages', false);
             } else {
-              record = await setRecordExtra(record, 'Document parsed pages', progress.toString(), false); // update the record parse progress
-              record = await setRecordExtra(record, 'Document pages total', progressOf.toString(), false); // update the record parse progress
+              record = await setRecordExtra(record, 'Document parsed pages', page.toString(), false); // update the record parse progress
+              record = await setRecordExtra(record, 'Document pages total', pages.toString(), false); // update the record parse progress
             }
   
             record = await updateRecord(record);
@@ -688,13 +694,15 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               [id]: {
                 progress,
                 progressOf,
+                page,
+                pages,
                 metadata,
                 textDelta: (prev[id]?.textDelta || '') + (metadata?.textDelta || ''),
                 pageDelta: metadata?.pageDelta || '',
                 recordText: metadata?.recordText || '',
                 history: [
                   ...prevHistory,
-                  { progress, progressOf, metadata, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
+                  { progress, progressOf, metadata, page, pages, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
                 ]
               }
             };
@@ -726,7 +734,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             setOperationStatus(DataLoadingStatus.Success);
 
             // Parsing is two or three stage operation: 1. OCR, 2. <optional> sensitive data removal, 3. LLM
-            const ocrProvider = await config?.getServerConfig('ocrProvider') || 'chatgpt';
+            const ocrProvider = await config?.getServerConfig('ocrProvider') || 'llm-aged'; // default LLM provider
             console.log('Using OCR provider:', ocrProvider);
 
             let updatedRecord: Record | null = null;
@@ -737,7 +745,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 updatedRecord = await tesseractParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
               } else if (ocrProvider === 'gemini') {
                 updatedRecord = await geminiParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
-              } else if (ocrProvider === 'chatgpt-paged') {
+              } else if (ocrProvider === 'llm-paged') {
                 updatedRecord = await chatgptPagedParseRecord(currentRecord, chatContext, config, folderContext, updateRecordFromText, updateParseProgress, attachments);
               } else {
                 toast.error('Unknown OCR provider: ' + ocrProvider);
@@ -751,7 +759,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             } catch (error) {
               console.error('Error processing record:', error);
               toast.error('Error processing record: ' + error);
-              if (currentRecord) updateParseProgress(currentRecord, false, error);
+              if (currentRecord) updateParseProgress(currentRecord, false, 0, 0, 0, 0, null, error);
             }
 
             console.log('Record parsed, taking next record', currentRecord);
@@ -761,7 +769,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             parseQueue = parseQueue.slice(1); // remove one item
             parseQueueLength = parseQueue.length;
 
-            if (currentRecord) updateParseProgress(currentRecord, false, error);
+            if (currentRecord) updateParseProgress(currentRecord, false, 0, 0, 0, 0, null, error);
           }
         }
         parseQueueInProgress = false;

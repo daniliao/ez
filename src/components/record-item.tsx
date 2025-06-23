@@ -249,10 +249,27 @@ useEffect(() => {
           {record.parseProgress && (
             <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-4">
               <FileText className="w-4 h-4 mr-2" />
-              Parse progress: {record.parseProgress.page} / {record.parseProgress.total}
+              Parsed pages: {record.parseProgress.page} / {record.parseProgress.pages}
             </div>
           )}
-
+          {record.parseProgress &&
+            typeof record.parseProgress.progress === 'number' &&
+            typeof record.parseProgress.progressOf === 'number' &&
+            record.parseProgress.progress > 0 &&
+            record.parseProgress.progressOf > 0 && (
+              <div className="w-full mt-2 mb-2">
+                <div className="h-2 bg-zinc-300 dark:bg-zinc-700 rounded">
+                  <div
+                    className="h-2 bg-blue-500 rounded"
+                    style={{ width: `${Math.min(100, Math.round((record.parseProgress.progress / record.parseProgress.progressOf) * 100))}%` }}
+                  ></div>
+                </div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
+                  {Math.round((record.parseProgress.progress / record.parseProgress.progressOf) * 100)}% parsed
+                </div>
+              </div>
+            )
+          }
           <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
             {record.attachments.map((attachment, index) => (
               <div key={index} className="text-sm inline-flex w-auto"><Button variant="outline" onClick={() => recordContext?.downloadAttachment(attachment.toDTO(), false)}><PaperclipIcon className="w-4 h-4 mr-2" /> {shorten(attachment.displayName)}</Button></div>

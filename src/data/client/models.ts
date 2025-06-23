@@ -160,7 +160,9 @@ export type PostParseCallback = (record: Record) => Promise<void>;
 
 export type ParseProgress = {
     page: number;
-    total: number;
+    pages: number;
+    progress: number;
+    progressOf: number;
     textDelta?: string;
     pageDelta?: string;
     recordText?: string;
@@ -200,6 +202,7 @@ export class Record {
       this.checksum = recordSource.checksum ? recordSource.checksum : '';
       this.checksumLastParsed = recordSource.checksumLastParsed ? recordSource.checksumLastParsed : '';
       this.parseInProgress = recordSource.parseInProgress ? recordSource.parseInProgress : false;
+      this.parseProgress = recordSource.parseProgress ? recordSource.parseProgress : null;
 
       
     if(recordSource instanceof Record) {

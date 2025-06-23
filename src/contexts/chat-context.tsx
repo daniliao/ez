@@ -349,7 +349,6 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
                 role: 'assistant',
                 visibility: MessageVisibility.Visible
             }            
-            setIsCrossChecking(true);
             const result = await streamText({
                 model: await aiProvider(providerName, modelName),
                 messages: convertToCoreMessages(messagesToSend),
@@ -384,7 +383,6 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
                 role: 'assistant',
                 visibility: MessageVisibility.Visible
             };
-            setIsCrossChecking(true);
             const result = await streamText({
                 model: await aiProvider(providerName, modelName),
                 messages: convertToCoreMessages(messagesToSend),
@@ -438,6 +436,7 @@ export const ChatContextProvider: React.FC<PropsWithChildren> = ({ children }) =
                 id: nanoid(),
             } as MessageEx            
         )
+        setIsCrossChecking(true);
         aiDirectCall(messages, (result, eventData) => {
             try {
                 if (result.content.indexOf('```json') > -1) {

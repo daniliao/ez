@@ -40,7 +40,7 @@ const processFiles = async (files: DisplayableDataObject[], selectedLanguage: st
 
   }
 
-export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, metadata: any, error: any) => void, sourceImages: DisplayableDataObject[]): Promise<Record>  {
+export async function parse(record: Record, chatContext: ChatContextType, configContext: ConfigContextType | null, folderContext: FolderContextType | null, updateRecordFromText: (text: string, record: Record, allowNewRecord: boolean) => Promise<Record|null>, updateParseProgress: (record: Record, inProgress: boolean, progress: number, progressOf: number, page: number, pages: number, metadata: any, error: any) => Promise<Record>, sourceImages: DisplayableDataObject[]): Promise<Record>  {
     return new Promise (async (resolve, reject) => {
 
         // TODO: add Tesseract parsing logic - then LLM - it should be configurable whichh LLM is being used for data parsing from tesseract text
@@ -69,7 +69,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
 
                         resultMessage.recordSaved = true;
                         resultMessage.recordRef = record;
-                        updateParseProgress(record, false, 0, 0, null, null);
+                        record = await updateParseProgress(record, false, 0, 0, 0, 0, null, null);
                         await record.updateChecksumLastParsed();
                         const updatedRecord = await updateRecordFromText(resultMessage.content, record, false);
                         if (updatedRecord) {

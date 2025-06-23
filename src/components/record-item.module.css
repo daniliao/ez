@@ -24,3 +24,8 @@
     margin-left: 15px;
     list-style-position: outside;
 }
+
+.markdown table td {
+    padding: 5px;
+}
+

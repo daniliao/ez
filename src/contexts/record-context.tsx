@@ -89,6 +89,9 @@ let parseQueueLength = 0;
 // Add this at the top, after parseQueue definition
 let autoTranslateAfterParse = new Set<number>();
 
+// Add this after autoTranslateAfterParse definition
+let recordsBeingTranslated = new Set<number>();
+
 // Parsing progress state: recordId -> { progress, progressOf, metadata, textDelta, pageDelta, history: [] }
 // We'll use a React state for this, so move it into the provider below.
 
@@ -1575,6 +1578,17 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
   }
 
   const translateRecord = async (record: Record, language: string = 'English') => {
+    // Check if this record is already being translated
+    if (typeof record.id === 'number' && recordsBeingTranslated.has(record.id)) {
+      console.log('Translation already in progress for record:', record.id, 'skipping');
+      return record;
+    }
+
+    // Add record to the set of records being translated
+    if (typeof record.id === 'number') {
+      recordsBeingTranslated.add(record.id);
+    }
+
     try {
       const parseAIProvider = await config?.getServerConfig('llmProviderParse') as string;
       const parseModelName = await config?.getServerConfig('llmModelParse') as string;
@@ -1704,6 +1718,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       console.error('Error translating record:', error);
       toast.error('Error translating record: ' + error);
       throw error;
+    } finally {
+      // Always remove the record from the set of records being translated
+      if (typeof record.id === 'number') {
+        recordsBeingTranslated.delete(record.id);
+      }
     }
   }
 
@@ -1716,31 +1735,43 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       
       if (lastUpdateResponse.status === 200 && 'data' in lastUpdateResponse) {
         const serverLastUpdate = lastUpdateResponse.data.lastUpdateDate;
-        const lastUpdatedRecordId = lastUpdateResponse.data.recordId;
         
-        // Check for recently finalized operations for the last updated record
-        if (lastUpdatedRecordId) {
-          const operationsApi = getOperationsApiClient();
-          const operationsResponse = await operationsApi.get({ recordId: lastUpdatedRecordId });
-          
-          if ('data' in operationsResponse && Array.isArray(operationsResponse.data) && operationsResponse.data.length > 0) {
-            const lastOperation = operationsResponse.data[0];
-            
-            if ((lastOperation.operationFinished || lastOperation.operationErrored) && 
-                lastOperation.operationLastStep && 
-                (!lastRefreshed || new Date(lastOperation.operationLastStep) > lastRefreshed)) {
-              
-              console.log('Last operation for last updated record just finalized, refreshing records');
-              await listRecords(forFolder);
-              return lastOperation.operationLastStep;
-            }
-          }
-        }
-        
-        // If we haven't refreshed yet or server data is newer, refresh
+        // Check if server data is newer than our last refresh
         if (!lastRefreshed || (serverLastUpdate && new Date(serverLastUpdate) > lastRefreshed)) {
           console.log('Server data is newer, refreshing records');
           await listRecords(forFolder);
+          return serverLastUpdate;
+        }
+        
+        // If server data hasn't changed, check for finished/errored operations for all records
+        const operationsApi = getOperationsApiClient();
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+        
+        // Get all records that are currently in progress
+        const recordsInProgress = records.filter(record => record.operationInProgress);
+        
+        if (recordsInProgress.length > 0) {
+          const recordIds = recordsInProgress.map(record => record.id).filter(id => id !== undefined) as number[];
+          
+          if (recordIds.length > 0) {
+            // Fetch operations for all records in progress
+            const operationsResponse = await operationsApi.get({ recordIds });
+            
+            if ('data' in operationsResponse && Array.isArray(operationsResponse.data)) {
+              const recentFinishedOperations = operationsResponse.data.filter(op => 
+                (op.operationFinished || op.operationErrored) && 
+                op.operationLastStep && 
+                new Date(op.operationLastStep) > new Date(twoMinutesAgo) &&
+                (!lastRefreshed || new Date(op.operationLastStep) > lastRefreshed)
+              );
+              
+              if (recentFinishedOperations.length > 0) {
+                console.log('Found recently finished operations, refreshing records');
+                await listRecords(forFolder);
+                return recentFinishedOperations[0].operationLastStep;
+              }
+            }
+          }
         }
       }
     } catch (error) {

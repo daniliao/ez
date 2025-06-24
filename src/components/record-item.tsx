@@ -69,6 +69,10 @@ function OperationProgressBar({ operationName, operationProgress }: { operationN
   const shouldShowProgress = operationProgress?.message || operationProgress?.processedOnDifferentDevice;
   
   if (shouldShowProgress) {
+    // Calculate progress percentage if available, otherwise show indeterminate progress
+    const hasProgressValues = operationProgress && typeof operationProgress.progress === 'number' && typeof operationProgress.progressOf === 'number' && operationProgress.progressOf > 0;
+    const percent = hasProgressValues ? Math.min(100, Math.round((operationProgress.progress / operationProgress.progressOf) * 100)) : null;
+    
     return (
       <div className="w-full mt-2 mb-2">
         <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-2">
@@ -78,6 +82,22 @@ function OperationProgressBar({ operationName, operationProgress }: { operationN
         {operationProgress?.processedOnDifferentDevice && (
           <div className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">
             ⚠️ This operation is running on another device
+          </div>
+        )}
+        {/* Show progress bar */}
+        <div className="h-2 bg-zinc-300 dark:bg-zinc-700 rounded">
+          {percent !== null ? (
+            <div
+              className="h-2 bg-blue-500 rounded"
+              style={{ width: `${percent}%` }}
+            ></div>
+          ) : (
+            <div className="h-2 bg-blue-500 rounded animate-pulse" style={{ width: '100%' }}></div>
+          )}
+        </div>
+        {percent !== null && (
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
+            {percent}% {operationName === RegisteredOperations.Parse ? 'parsed' : operationName === RegisteredOperations.Translate ? 'translated' : ''}
           </div>
         )}
       </div>

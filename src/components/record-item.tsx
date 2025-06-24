@@ -76,7 +76,6 @@ function OperationProgressBar({ operationName, operationProgress }: { operationN
     return (
       <div className="w-full mt-2 mb-2">
         <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-2">
-          <FileText className="w-4 h-4 mr-2" />
           {operationProgress.message || 'Operation in progress on different device...'}
         </div>
         {operationProgress?.processedOnDifferentDevice && (

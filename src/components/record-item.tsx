@@ -65,11 +65,23 @@ const MarkdownLinkHandler = ({node, href, children, ...props}: {node?: any; href
 
 // --- OperationProgressBar component ---
 function OperationProgressBar({ operationName, operationProgress }: { operationName: string, operationProgress: any }) {
+  if (operationProgress?.message) {
+    return (
+      <div className="w-full mt-2 mb-2">
+        <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-2">
+          <FileText className="w-4 h-4 mr-2" />
+          {operationProgress.message}
+        </div>  
+      </div>
+    );
+  }
   if (!operationProgress || typeof operationProgress.progress !== 'number' || typeof operationProgress.progressOf !== 'number' || operationProgress.progress <= 0 || operationProgress.progressOf <= 0) {
-    return null;
+  return null;
   }
   const percent = Math.min(100, Math.round((operationProgress.progress / operationProgress.progressOf) * 100));
   let label = '';
+
+
   if (operationName === RegisteredOperations.Parse) {
     label = `Parsed pages: ${operationProgress.page} / ${operationProgress.pages}`;
   } else if (operationName === RegisteredOperations.Translate) {
@@ -115,7 +127,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const [progressDialogOpen, setProgressDialogOpen] = useState(false);
 
   const [displayableAttachments, setDisplayableAttachments] = useState<DisplayableDataObject[]>([]);
-  const parsingProgress = recordContext?.operationProgressByRecordId[record.id?.toString() || 'unknown'];
+  const operationProgress = recordContext?.operationProgressByRecordId[record.id?.toString() || 'unknown'];
 
   const loadAttachmentPreviews = async () => {
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
@@ -280,7 +292,7 @@ useEffect(() => {
           {/* Show operation progress bar for any operation in progress (parse or translate) */}
           {record.operationInProgress &&
             (
-              <OperationProgressBar operationName={record.operationName} operationProgress={record.operationProgress} />
+              <OperationProgressBar operationName={record.operationName} operationProgress={operationProgress} />
             )
           }
 
@@ -318,6 +330,8 @@ useEffect(() => {
 
           <div className="text-sm text-zinc-500 dark:text-zinc-400 text-left font-medium flex justify-center mt-2 pr-3">
             For all cool AI features, we need to OCR and parse record data first. Records in queue: {recordContext?.parseQueueLength}. Do not close the browser window. Parsing record in progress... <DataLoader />
+            {!operationProgress?.processedOnDifferentDevice && (
+              
             <Button
               className="ml-2"
               onClick={() => {
@@ -327,6 +341,8 @@ useEffect(() => {
             >
               Check progress...
             </Button>
+                        )}
+
           </div>
 
         </div>
@@ -391,7 +407,7 @@ useEffect(() => {
       {/* Show operation progress bar for any operation in progress (parse or translate) */}
       {record.operationInProgress &&
         (
-          <OperationProgressBar operationName={record.operationName} operationProgress={record.operationProgress} />
+          <OperationProgressBar operationName={record.operationName} operationProgress={operationProgress} />
         )
       }
 

@@ -169,12 +169,14 @@ export type PostParseCallback = (record: Record) => Promise<void>;
 export type OperationProgress = {
     page: number;
     pages: number;
-    operationName: string;
+    operationName?: string;
     progress: number;
     progressOf: number;
     textDelta?: string;
     pageDelta?: string;
     recordText?: string;
+    processedOnDifferentDevice?: boolean;
+    message?: string;
 }
 export class Record {
     id?: number;

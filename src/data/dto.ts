@@ -92,6 +92,9 @@ export const recordDTOSchema = z.object({
 
   operationName: z.string().optional().nullable(),
   operationProgress: z.object({
+    operationName: z.string().optional().nullable(),
+    processedOnDifferentDevice: z.boolean().optional().nullable(),
+    message: z.string().optional().nullable(),
     page: z.number().positive().int(),
     pages: z.number().positive().int(),
     progress: z.number().positive().int(),

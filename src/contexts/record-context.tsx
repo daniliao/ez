@@ -34,6 +34,7 @@ import { nanoid } from 'nanoid';
 import { parse as chatgptPagedParseRecord } from '@/ocr/ocr-llm-provider-paged';
 import { PdfConversionApiClient } from '@/data/client/pdf-conversion-api-client';
 import { isIOS } from '@/lib/utils';
+import { OperationsApiClient } from '@/data/client/operations-api-client';
 
 
 // Add the helper function before the parseQueueInProgress variable
@@ -678,6 +679,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     })
   }
 
+  // Helper to get the operations API client
+  const getOperationsApiClient = () => {
+    return new OperationsApiClient('', dbContext, saasContext, { useEncryption: false });
+  };
+
   const updateOperationProgress = async (record: Record, operation: string, inProgress: boolean, progress: number = 0, progressOf: number = 0, page: number = 0, pages: number = 0, metadata: any = null, error: any = null): Promise<Record> => {
 
 
@@ -686,23 +692,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     record.operationError = error;
 
     if (inProgress !== record.operationInProgress || error !== record.operationError) {
-
-      if (!inProgress) {
-        record = await removeRecordExtra(record, 'Parse process started on', false);
-        record = await removeRecordExtra(record, 'Parse process started on user agent', false);
-        record = await removeRecordExtra(record, 'Parse process session id', false);
-  
-        record = await updateRecord(record);
-      } else { 
-        record = await setRecordExtra(record, 'Parse process started on', new Date().toISOString(), false);
-        record = await setRecordExtra(record, 'Parse process started on user agent', navigator.userAgent, false);
-        record = await setRecordExtra(record, 'Parse process session id', dbContext?.authorizedSessionId || '', false);
-        record = await setRecordExtra(record, 'Parse process last step', new Date().toISOString(), false);
-  
-        record = await updateRecord(record);      
-      }
-//      setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state - is set by updateRecord anyways
-
+     setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state - is set by updateRecord anyways
     }
 
 
@@ -767,6 +757,31 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       };
     });
 
+    // Send progress update to operations API
+    const operationsApi = getOperationsApiClient();
+    if (typeof record.id !== 'number') return record; // cannot update operation without recordId
+    const operationId = `parse-${record.id}`;
+    const operationDTO = {
+      id: undefined,
+      recordId: record.id,
+      operationId,
+      operationName: operation,
+      operationProgress: progress,
+      operationProgressOf: progressOf,
+      operationPage: page,
+      operationPages: pages,
+      operationMessage: metadata?.message || null,
+      operationTextDelta: metadata?.textDelta || null,
+      operationPageDelta: metadata?.pageDelta || null,
+      operationRecordText: metadata?.recordText || null,
+      operationStartedOn: new Date().toISOString(),
+      operationStartedOnUserAgent: navigator.userAgent,
+      operationStartedOnSessionId: dbContext?.authorizedSessionId || null,
+      operationLastStep: new Date().toISOString(),
+      operationLastStepUserAgent: navigator.userAgent,
+      operationLastStepSessionId: dbContext?.authorizedSessionId || null
+    };
+    await operationsApi.update(operationDTO);
 
     return record;
   }
@@ -836,23 +851,44 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
   }
 
   const parseRecord = async (newRecord: Record, postParseCallback?: PostParseCallback) => {
-    if (!parseQueue.find(pr => pr.id === newRecord.id) && (newRecord.attachments.length > 0 || newRecord.transcription)) {
-
-      const startedOn = await getRecordExtra(newRecord, 'Parse process started on');
-      const lastStep = await getRecordExtra(newRecord, 'Parse process last step') as string;
-      const lastStepSessionId = await getRecordExtra(newRecord, 'Parse process session id');
-      const lastStepUserAgent = await getRecordExtra(newRecord, 'Parse process started on user agent');
-
-
-      if (lastStepSessionId !== dbContext?.authorizedSessionId) { // started on different device
-        const timeFromLastStep = new Date().getTime() - new Date(lastStep).getTime();
-        if (timeFromLastStep < 2 * 60 * 1000) { // less than 2 minutes and started on different device
-          await updateOperationProgress(newRecord, RegisteredOperations.Parse, true, 0, 0, 0, 0, { message: 'Parse process started on ' + lastStepUserAgent + ' last data chunk received on' + lastStep, processedOnDifferentDevice: true });
-
+    const operationsApi = getOperationsApiClient();
+    if (typeof newRecord.id !== 'number') return;
+    // Check if there is an ongoing operation for this record
+    const opRes = await operationsApi.get({ recordId: newRecord.id });
+    if ('data' in opRes && Array.isArray(opRes.data) && opRes.data.length > 0) {
+      const ongoingOp = opRes.data[0];
+      // Check if operation is in progress and session is different
+      if (ongoingOp.operationLastStepSessionId && ongoingOp.operationLastStepSessionId !== dbContext?.authorizedSessionId) {
+        const timeFromLastStep = new Date().getTime() - new Date(ongoingOp.operationLastStep || '').getTime();
+        if (timeFromLastStep < 2 * 60 * 1000) {
+          await updateOperationProgress(newRecord, RegisteredOperations.Parse, true, 0, 0, 0, 0, { message: 'Parse process started on ' + ongoingOp.operationStartedOnUserAgent + ' last data chunk received on ' + ongoingOp.operationLastStep, processedOnDifferentDevice: true });
           return;
         }
       }
-
+    } else {
+      // No ongoing operation, create a lock
+      await operationsApi.create({
+        id: undefined,
+        recordId: newRecord.id,
+        operationId: `parse-${newRecord.id}`,
+        operationName: RegisteredOperations.Parse,
+        operationProgress: 0,
+        operationProgressOf: 0,
+        operationPage: 0,
+        operationPages: 0,
+        operationMessage: null,
+        operationTextDelta: null,
+        operationPageDelta: null,
+        operationRecordText: null,
+        operationStartedOn: new Date().toISOString(),
+        operationStartedOnUserAgent: navigator.userAgent,
+        operationStartedOnSessionId: dbContext?.authorizedSessionId || null,
+        operationLastStep: new Date().toISOString(),
+        operationLastStepUserAgent: navigator.userAgent,
+        operationLastStepSessionId: dbContext?.authorizedSessionId || null
+      });
+    }
+    if (!parseQueue.find(pr => pr.id === newRecord.id) && (newRecord.attachments.length > 0 || newRecord.transcription)) {
       if (postParseCallback) {
         newRecord.postParseCallback = postParseCallback;
       }

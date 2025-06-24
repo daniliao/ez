@@ -1716,14 +1716,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       
       if (lastUpdateResponse.status === 200 && 'data' in lastUpdateResponse) {
         const serverLastUpdate = lastUpdateResponse.data.lastUpdateDate;
+        const lastUpdatedRecordId = lastUpdateResponse.data.recordId;
         
-        // Check for recently finalized operations for the last record
-        const operationsApi = getOperationsApiClient();
-        
-        // Get the last record to check its operations
-        const lastRecord = records.length > 0 ? records[records.length - 1] : null;
-        if (lastRecord && lastRecord.id) {
-          const operationsResponse = await operationsApi.get({ recordId: lastRecord.id });
+        // Check for recently finalized operations for the last updated record
+        if (lastUpdatedRecordId) {
+          const operationsApi = getOperationsApiClient();
+          const operationsResponse = await operationsApi.get({ recordId: lastUpdatedRecordId });
+          
           if ('data' in operationsResponse && Array.isArray(operationsResponse.data) && operationsResponse.data.length > 0) {
             const lastOperation = operationsResponse.data[0];
             
@@ -1731,12 +1730,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 lastOperation.operationLastStep && 
                 (!lastRefreshed || new Date(lastOperation.operationLastStep) > lastRefreshed)) {
               
-              console.log('Last operation for last record just finalized, returning finalization date');
-              // Return the finalization date as the new record date
-
-              console.log('New operation finish or error, refreshing records');
+              console.log('Last operation for last updated record just finalized, refreshing records');
               await listRecords(forFolder);
-    
               return lastOperation.operationLastStep;
             }
           }
@@ -1744,7 +1739,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         
         // If we haven't refreshed yet or server data is newer, refresh
         if (!lastRefreshed || (serverLastUpdate && new Date(serverLastUpdate) > lastRefreshed)) {
-          console.log('New operation finish or error, refreshing records');
+          console.log('Server data is newer, refreshing records');
           await listRecords(forFolder);
         }
       }

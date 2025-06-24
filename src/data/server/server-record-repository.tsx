@@ -45,15 +45,15 @@ export default class ServerRecordRepository extends BaseRepository<RecordDTO> {
         return Promise.resolve(dbQuery.all() as RecordDTO[])
     }
 
-    async getLastUpdateDate(folderId: number): Promise<string | null> {
+    async getLastUpdateDate(folderId: number): Promise<{ recordId: number; updatedAt: string } | null> {
         const db = (await this.db());
-        const result = db.select({ updatedAt: records.updatedAt })
+        const result = db.select({ id: records.id, updatedAt: records.updatedAt })
             .from(records)
             .where(eq(records.folderId, folderId))
             .orderBy(desc(records.updatedAt))
             .limit(1)
-            .get() as { updatedAt: string } | undefined;
+            .get() as { id: number; updatedAt: string } | undefined;
         
-        return result?.updatedAt || null;
+        return result ? { recordId: result.id, updatedAt: result.updatedAt } : null;
     }
 }

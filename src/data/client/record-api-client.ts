@@ -19,7 +19,10 @@ export type DeleteRecordResponse = {
 
 export type GetLastUpdateDateResponseSuccess = {
   message: string;
-  data: { lastUpdateDate: string | null };
+  data: { 
+    lastUpdateDate: string | null;
+    recordId: number | null;
+  };
   status: 200;
 };
 

@@ -767,10 +767,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
     record.operationError = error;
 
-    if (progress === 0) {
-      console.log('Progress is 0, skipping', progress, progressOf, page, pages, metadata, error);
-    }
-
     if (progress > 0 && progressOf > 0) {
       const lastStep = await getRecordExtra(record, 'Parse process last step');
       record = await setRecordExtra(record, 'Parse process last step', new Date().toISOString(), (new Date().getTime() - new Date(lastStep as string).getTime()) > 30 * 60 * 1000); // save progress every 30s

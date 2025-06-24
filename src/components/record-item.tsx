@@ -290,7 +290,7 @@ useEffect(() => {
       {isInProgress && operationProgress?.operationName === RegisteredOperations.Parse ? (
         <div className="bg-zinc-100 dark:bg-zinc-800 md:p-4 xs:p-2 md:rounded-md mb-4 xs:mb-2">
           <div className="text-sm text-zinc-500 dark:text-zinc-400 flex font-bold mb-4">
-            Record saved succesfully, processing in progress...
+            Record {record.id} saved succesfully, processing in progress...
           </div>
           {/* Show operation progress bar for any operation in progress (parse or translate) */}
           {isInProgress &&

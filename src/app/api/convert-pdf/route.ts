@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { convertServerSide } from '@/lib/pdf2js-server';
 import { authorizeRequestContext } from '@/lib/generic-api';
 import { StorageService } from '@/lib/storage-service';
+import { EncryptionUtils } from '@/lib/crypto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,7 +12,20 @@ export async function POST(request: NextRequest) {
     const tempDir = storageService.getTempDir();
 
     const body = await request.json();
-    const { pdfBase64, conversion_config } = body;
+    let { pdfBase64, conversion_config, storageKey } = body;
+
+    if (storageKey) {
+      const attachment = await storageService.readAttachment(storageKey);
+      if (context.masterKey) { // if the encryption key is provided, we need to decrypt the attachment
+        const attachmentEncryptionUtils = new EncryptionUtils(context.masterKey as string);
+        const decryptedAttachment = await attachmentEncryptionUtils.decryptArrayBuffer(attachment as ArrayBuffer);
+        pdfBase64 = Buffer.from(decryptedAttachment).toString('base64');
+      }
+
+      if (!attachment) {
+        return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
+      }
+    }
 
     if (!pdfBase64) {
       return NextResponse.json(

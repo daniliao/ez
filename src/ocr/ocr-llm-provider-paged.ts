@@ -31,7 +31,7 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             for (let pageAcc = 1; pageAcc <= page; pageAcc++) {
                 const pageText = await getRecordExtra(record, 'Page ' + pageAcc + ' content') as string; /// accumulate the page content - as we're saving it page by page
                 if (pageText) {
-                    recordText += pageText;
+                    recordText += pageText + '\n\r\n\r';
                 }
             }
             

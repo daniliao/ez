@@ -86,6 +86,9 @@ let parseQueueInProgress = false;
 let parseQueue: Record[] = []
 let parseQueueLength = 0;
 
+// Add this at the top, after parseQueue definition
+let autoTranslateAfterParse = new Set<number>();
+
 // Parsing progress state: recordId -> { progress, progressOf, metadata, textDelta, pageDelta, history: [] }
 // We'll use a React state for this, so move it into the provider below.
 
@@ -324,6 +327,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           updateOperationProgressState(updatedRecord, 'parse', 0,0,0,0, null);
           
           // Call parseRecord immediately for new records
+          // Also trigger auto-translate if enabled
+          const autoTranslate = await config?.getServerConfig('autoTranslateRecord');
+          if (autoTranslate && response.data.id !== undefined) {
+            autoTranslateAfterParse.add(response.data.id);
+          }
           parseRecord(updatedRecord);
         }
 
@@ -603,30 +611,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         console.log('Adding to parse queue - needs parsing:', record.id, 'json exists:', hasJson, 'checksum mismatch:', checksumMismatch, 'checksum:', record.checksum, 'checksumLastParsed:', record.checksumLastParsed);
         
         if (autoTranslate) {
-          console.log('Auto-translate enabled, setting up callback for record:', record.id);
-          parseRecord(record, async (parsedRecord) => {
-            console.log('Parse completed, starting auto-translate for record:', parsedRecord.id);
-            
-            // Check for ongoing translation operations to prevent duplicate translations
-            const translationOperationCheck = await checkOngoingOperation(parsedRecord.id || 0, RegisteredOperations.Translate);
-            
-            if (translationOperationCheck.hasOngoingOperation) {
-              if (translationOperationCheck.isDifferentSession) {
-                console.log('Translation already in progress on different session for record:', parsedRecord.id);
-                return; // Don't start translation if it's already running on a different session
-              } else {
-                console.log('Translation already in progress on same session for record:', parsedRecord.id);
-                return; // Don't start translation if it's already running on the same session
-              }
-            }
-            
-            try {
-              await translateRecord(parsedRecord);
-              console.log('Auto-translate completed for record:', parsedRecord.id);
-            } catch (error) {
-              console.error('Error in auto-translate callback for record:', parsedRecord.id, error);
-            }
-          });
+          console.log('Auto-translate enabled, will trigger after parse for record:', record.id);
+          autoTranslateAfterParse.add(record.id!);
+          parseRecord(record);
         } else {
           console.log('Auto-translate disabled');
           parseRecord(record);

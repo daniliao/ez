@@ -295,7 +295,7 @@ useEffect(() => {
           {/* Show operation progress bar for any operation in progress (parse or translate) */}
           {isInProgress &&
             (
-              <OperationProgressBar operationName={operationProgress?.operationName} operationProgress={operationProgress} />
+              <OperationProgressBar operationName={operationProgress?.operationName || 'unknown'} operationProgress={operationProgress} />
             )
           }
 
@@ -410,7 +410,7 @@ useEffect(() => {
       {/* Show operation progress bar for any operation in progress (parse or translate) */}
       {isInProgress &&
         (
-          <OperationProgressBar operationName={operationProgress?.operationName} operationProgress={operationProgress} />
+          <OperationProgressBar operationName={operationProgress?.operationName || 'unknown'} operationProgress={operationProgress} />
         )
       }
 

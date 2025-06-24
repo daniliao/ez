@@ -303,6 +303,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       // Use the helper function to discover event date
       record.eventDate = discoverEventDate(record);
 
+      // Update checksum to reflect current state of attachments and transcription
+      await record.updateChecksum();
+
       const recordDTO = record.toDTO(); // DTOs are common ground between client and server
       const response = await client.put(recordDTO);
       const newRecord = typeof record?.id === 'undefined'
@@ -543,6 +546,30 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     }
   };
 
+  // Helper function to check if a record is user-uploaded (should be parsed) vs programmatically created (should not be parsed)
+  const isUserUploadedRecord = (record: Record): boolean => {
+    // Check if record has translation-related extra fields
+    const hasTranslationLanguage = record.extra?.find(e => e.type === 'Translation language');
+    const hasReferenceRecordIds = record.extra?.find(e => e.type === 'Reference record Ids');
+    const hasPreservedAttachments = record.extra?.find(e => e.type === 'Preserved attachments');
+    
+    // If record has any of these fields, it's programmatically created (translation, etc.)
+    if (hasTranslationLanguage || hasReferenceRecordIds || hasPreservedAttachments) {
+      console.log('Skipping programmatically created record:', record.id, 'translation language:', !!hasTranslationLanguage, 'reference ids:', !!hasReferenceRecordIds, 'preserved attachments:', !!hasPreservedAttachments);
+      return false;
+    }
+    
+    // Only parse records with attachments - records without attachments should not be parsed
+    const hasAttachments = record.attachments && record.attachments.length > 0;
+    
+    if (!hasAttachments) {
+      console.log('Skipping record without attachments:', record.id, 'attachments count:', record.attachments?.length || 0);
+      return false;
+    }
+    
+    return true;
+  };
+
   // Helper function to auto-parse records that need parsing
   const autoParseRecords = async (records: Record[]) => {
     if (!config) return;
@@ -553,13 +580,26 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     const autoTranslate = await config.getServerConfig('autoTranslateRecord');
     
     for (const record of records) {
-      // Check if record needs parsing: checksum mismatch, not in progress, no errors, and updated within last hour
-      if (record.checksum !== record.checksumLastParsed && 
+      // Only parse user-uploaded records, not programmatically created ones
+      if (!isUserUploadedRecord(record)) {
+        console.log('Skipping non-user-uploaded record for auto-parsing:', record.id);
+        continue;
+      }
+      
+      // Check if record needs parsing: 
+      // 1. No json object defined (never parsed) OR checksum mismatch (content changed)
+      // 2. Not in progress
+      // 3. No errors
+      // 4. Updated within last hour
+      const hasJson = record.json && record.json.length > 0;
+      const checksumMismatch = record.checksum !== record.checksumLastParsed;
+      const needsParsing = (!hasJson || checksumMismatch) && 
           !record.operationInProgress && 
           !record.operationError && 
-          (new Date().getTime() - new Date(record.updatedAt).getTime()) < 1000 * 60 * 60) {
-        
-        console.log('Adding to parse queue due to checksum mismatch ', record.id, record.checksum, record.checksumLastParsed);
+          (new Date().getTime() - new Date(record.updatedAt).getTime()) < 1000 * 60 * 60;
+      
+      if (needsParsing) {
+        console.log('Adding to parse queue - needs parsing:', record.id, 'json exists:', hasJson, 'checksum mismatch:', checksumMismatch, 'checksum:', record.checksum, 'checksumLastParsed:', record.checksumLastParsed);
         
         if (autoTranslate) {
           console.log('Auto-translate enabled, setting up callback');
@@ -570,6 +610,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           console.log('Auto-translate disabled');
           parseRecord(record);
         }
+      } else {
+        console.log('Skipping record - already parsed:', record.id, 'json exists:', hasJson, 'checksum match:', !checksumMismatch, 'checksum:', record.checksum, 'checksumLastParsed:', record.checksumLastParsed);
       }
     }
     
@@ -606,8 +648,15 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             // Find the operation for this record
             const operation = recentOperations.find(op => op.recordId === record.id);
             if (operation) {
-              // Check if operation is from a different session/device
-              if (operation.operationLastStepSessionId && operation.operationLastStepSessionId !== dbContext?.authorizedSessionId) {
+              // Use shared helper to check operation status
+              const operationCheck = {
+                hasOngoingOperation: true,
+                isDifferentSession: operation.operationLastStepSessionId && operation.operationLastStepSessionId !== dbContext?.authorizedSessionId,
+                operation: operation,
+                shouldResume: operation.operationName === RegisteredOperations.Parse && operation.operationLastStepSessionId === dbContext?.authorizedSessionId
+              };
+              
+              if (operationCheck.isDifferentSession) {
                 const message = `Operation started on ${operation.operationStartedOnUserAgent} last data chunk received on ${operation.operationLastStep}`;
                 
                 // Update operation progress state with processedOnDifferentDevice flag
@@ -643,6 +692,19 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                     recordText: operation.operationRecordText || ''
                   }
                 );
+                
+                // Resume parsing for records that are in progress but not finished and belong to current session
+                if (operationCheck.shouldResume) {
+                  console.log('Resuming parsing for record:', record.id, 'from same session');
+                  
+                  // Check if record is not already in parse queue
+                  if (!parseQueue.find(pr => pr.id === record.id)) {
+                    // Add to parse queue to resume parsing
+                    parseQueue.push(updatedRecord);
+                    parseQueueLength = parseQueue.length;
+                    console.log('Added to parse queue for resuming: ', parseQueue.length);
+                  }
+                }
               }
             }
           }
@@ -651,6 +713,12 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         });
         
         setRecords(updatedRecords);
+        
+        // Process the parse queue if we added any records for resuming
+        if (parseQueue.length > 0 && !parseQueueInProgress) {
+          processParseQueue();
+        }
+        
         return updatedRecords;
       }
     } catch (error) {
@@ -825,35 +893,145 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     return new OperationsApiClient('', dbContext, saasContext, { useEncryption: false });
   };
 
-  // Helper to send operation progress update (fire-and-forget)
-  const sendOperationProgressUpdate = (record: Record, operation: string, progress: number, progressOf: number, page: number, pages: number, metadata: any, finished = false, errored = false, errorMessage: string | null = null) => {
-    if (typeof record.id !== 'number') return;
+  // Shared helper to check for ongoing operations for a specific record
+  const checkOngoingOperation = async (recordId: number, operationName?: string) => {
     const operationsApi = getOperationsApiClient();
-    const operationId = `${operation}-${record.id}`;
+    const opRes = await operationsApi.get({ recordId });
+    
+    if ('data' in opRes && Array.isArray(opRes.data) && opRes.data.length > 0) {
+      const ongoingOp = opRes.data[0];
+      
+      // Check if operation is finished or errored - if so, don't consider it ongoing
+      if (ongoingOp.operationFinished || ongoingOp.operationErrored) {
+        console.log('Operation is finished or errored, not ongoing:', recordId, 'finished:', ongoingOp.operationFinished, 'errored:', ongoingOp.operationErrored);
+        return {
+          hasOngoingOperation: false,
+          isDifferentSession: false,
+          operation: ongoingOp,
+          shouldResume: false
+        };
+      }
+      
+      // Check if operation is from a different session
+      if (ongoingOp.operationLastStepSessionId && ongoingOp.operationLastStepSessionId !== dbContext?.authorizedSessionId) {
+        const timeFromLastStep = new Date().getTime() - new Date(ongoingOp.operationLastStep || '').getTime();
+        if (timeFromLastStep < 2 * 60 * 1000) {
+          return {
+            hasOngoingOperation: true,
+            isDifferentSession: true,
+            operation: ongoingOp,
+            shouldResume: false
+          };
+        }
+      } else {
+        // Same session
+        return {
+          hasOngoingOperation: true,
+          isDifferentSession: false,
+          operation: ongoingOp,
+          shouldResume: operationName ? ongoingOp.operationName === operationName : true
+        };
+      }
+    }
+    
+    return {
+      hasOngoingOperation: false,
+      isDifferentSession: false,
+      operation: null,
+      shouldResume: false
+    };
+  };
+
+  // Helper to create an operation lock
+  const createOperationLock = async (recordId: number, operationName: string) => {
+    const operationsApi = getOperationsApiClient();
+    await operationsApi.create({
+      id: undefined,
+      recordId: recordId,
+      operationId: `${operationName}-${recordId}`,
+      operationName: operationName,
+      operationProgress: 0,
+      operationProgressOf: 0,
+      operationPage: 0,
+      operationPages: 0,
+      operationMessage: null,
+      operationTextDelta: null,
+      operationPageDelta: null,
+      operationRecordText: null,
+      operationStartedOn: new Date().toISOString(),
+      operationStartedOnUserAgent: navigator.userAgent,
+      operationStartedOnSessionId: dbContext?.authorizedSessionId || null,
+      operationLastStep: new Date().toISOString(),
+      operationLastStepUserAgent: navigator.userAgent,
+      operationLastStepSessionId: dbContext?.authorizedSessionId || null
+    });
+  };
+
+  // Helper to finish an operation
+  const finishOperation = async (recordId: number, operationName: string, error: any = null) => {
+    const operationsApi = getOperationsApiClient();
+    const operationId = `${operationName}-${recordId}`;
     const operationDTO = {
       id: undefined,
-      recordId: record.id,
+      recordId: recordId,
       operationId,
-      operationName: operation,
-      operationProgress: Math.round(progress),
-      operationProgressOf: Math.round(progressOf),
-      operationPage: page,
-      operationPages: pages,
-      operationMessage: metadata?.message || null,
-      operationTextDelta: metadata?.textDelta || null,
-      operationPageDelta: metadata?.pageDelta || null,
-      operationRecordText: metadata?.recordText || null,
+      operationName: operationName,
+      operationProgress: 100,
+      operationProgressOf: 100,
+      operationPage: 0,
+      operationPages: 0,
+      operationMessage: error ? 'Operation failed' : 'Operation completed successfully',
+      operationTextDelta: null,
+      operationPageDelta: null,
+      operationRecordText: null,
       operationStartedOn: new Date().toISOString(),
       operationStartedOnUserAgent: navigator.userAgent,
       operationStartedOnSessionId: dbContext?.authorizedSessionId || null,
       operationLastStep: new Date().toISOString(),
       operationLastStepUserAgent: navigator.userAgent,
       operationLastStepSessionId: dbContext?.authorizedSessionId || null,
-      operationFinished: finished,
-      operationErrored: errored,
-      operationErrorMessage: errorMessage,
+      operationFinished: !error,
+      operationErrored: !!error,
+      operationErrorMessage: error ? getErrorMessage(error) : null,
     };
-    operationsApi.update(operationDTO); // fire-and-forget
+    await operationsApi.update(operationDTO);
+    console.log('Operation finished:', recordId, operationName, 'error:', !!error);
+  };
+
+  // Helper to send operation progress update (fire-and-forget)
+  const sendOperationProgressUpdate = (record: Record, operation: string, progress: number, progressOf: number, page: number, pages: number, metadata: any, finished = false, errored = false, errorMessage: string | null = null) => {
+    if (typeof record.id !== 'number') return;
+    
+    try {
+      const operationsApi = getOperationsApiClient();
+      const operationId = `${operation}-${record.id}`;
+      const operationDTO = {
+        id: undefined,
+        recordId: record.id,
+        operationId,
+        operationName: operation,
+        operationProgress: Math.round(progress),
+        operationProgressOf: Math.round(progressOf),
+        operationPage: page,
+        operationPages: pages,
+        operationMessage: metadata?.message || null,
+        operationTextDelta: metadata?.textDelta || null,
+        operationPageDelta: metadata?.pageDelta || null,
+        operationRecordText: metadata?.recordText || null,
+        operationStartedOn: new Date().toISOString(),
+        operationStartedOnUserAgent: navigator.userAgent,
+        operationStartedOnSessionId: dbContext?.authorizedSessionId || null,
+        operationLastStep: new Date().toISOString(),
+        operationLastStepUserAgent: navigator.userAgent,
+        operationLastStepSessionId: dbContext?.authorizedSessionId || null,
+        operationFinished: finished,
+        operationErrored: errored,
+        operationErrorMessage: errorMessage,
+      };
+      operationsApi.update(operationDTO); // fire-and-forget
+    } catch (error) {
+      console.error('Error sending operation progress update:', error);
+    }
   };
 
   // Helper to update operation progress state
@@ -894,7 +1072,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
       setRecords(prevRecords => {
         const updated = prevRecords.map(pr => pr.id === record.id ? record : pr);
-        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, progress > 0 && progressOf > 0, error !== null, error ? getErrorMessage(error) : null);
+        // Mark operation as finished when inProgress is false (operation complete)
+        const isFinished = !inProgress && !error;
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, isFinished, error !== null, error ? getErrorMessage(error) : null);
         return updated;
       });
     }
@@ -930,11 +1110,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         }
 
         record = await updateRecord(record);
-        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, progress === (progressOf - 1), false, null);
+        // Only mark as finished if this is the last page and operation is complete
+        const isLastPage = progress === (progressOf - 1);
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, isLastPage && !inProgress, false, null);
       }
       // Fire every 30 tokens in between
       if (progress % 30 === 0) {
-        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, progress === (progressOf - 1), false, null);
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, false, false, null);
       }
     }
 
@@ -991,10 +1173,19 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           if (updatedRecord && currentRecord.postParseCallback) {
             await currentRecord.postParseCallback(updatedRecord);
           }
+          
+          // Explicitly finish the operation successfully
+          if (currentRecord) {
+            await finishOperation(currentRecord.id!, RegisteredOperations.Parse);
+          }
         } catch (error) {
           console.error('Error processing record:', error);
           toast.error('Error processing record: ' + error);
-          if (currentRecord) updateOperationProgress(currentRecord, RegisteredOperations.Parse, false, 0, 0, 0, 0, null, error);
+          if (currentRecord) {
+            await updateOperationProgress(currentRecord, RegisteredOperations.Parse, false, 0, 0, 0, 0, null, error);
+            // Explicitly finish the operation with error
+            await finishOperation(currentRecord.id!, RegisteredOperations.Parse, error);
+          }
         }
 
         console.log('Record parsed, taking next record', currentRecord);
@@ -1004,50 +1195,62 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         parseQueue = parseQueue.slice(1); // remove one item
         parseQueueLength = parseQueue.length;
 
-        if (currentRecord) updateOperationProgress(currentRecord, RegisteredOperations.Parse, false, 0, 0, 0, 0, null, error);
+        if (currentRecord) {
+          await updateOperationProgress(currentRecord, RegisteredOperations.Parse, false, 0, 0, 0, 0, null, error);
+          // Explicitly finish the operation with error
+          await finishOperation(currentRecord.id!, RegisteredOperations.Parse, error);
+        }
       }
     }
     parseQueueInProgress = false;
   }
 
   const parseRecord = async (newRecord: Record, postParseCallback?: PostParseCallback) => {
-    const operationsApi = getOperationsApiClient();
     if (typeof newRecord.id !== 'number') return;
-    // Check if there is an ongoing operation for this record
-    const opRes = await operationsApi.get({ recordId: newRecord.id });
-    if ('data' in opRes && Array.isArray(opRes.data) && opRes.data.length > 0) {
-      const ongoingOp = opRes.data[0];
-      // Check if operation is in progress and session is different
-      if (ongoingOp.operationLastStepSessionId && ongoingOp.operationLastStepSessionId !== dbContext?.authorizedSessionId) {
-        const timeFromLastStep = new Date().getTime() - new Date(ongoingOp.operationLastStep || '').getTime();
-        if (timeFromLastStep < 2 * 60 * 1000) {
-          await updateOperationProgress(newRecord, RegisteredOperations.Parse, true, 0, 0, 0, 0, { message: 'Parse process started on ' + ongoingOp.operationStartedOnUserAgent + ' last data chunk received on ' + ongoingOp.operationLastStep, processedOnDifferentDevice: true });
-          return;
-        }
+    
+    // Check if this is a user-uploaded record that should be parsed
+    if (!isUserUploadedRecord(newRecord)) {
+      console.log('Skipping parse for non-user-uploaded record:', newRecord.id);
+      if (postParseCallback) {
+        postParseCallback(newRecord);
+      }
+      return;
+    }
+    
+    // Early check: if record already has json and no checksum mismatch, skip parsing
+    const hasJson = newRecord.json && newRecord.json.length > 0;
+    const checksumMatch = newRecord.checksum === newRecord.checksumLastParsed;
+    
+    if (hasJson && checksumMatch) {
+      console.log('Record already parsed and up to date, skipping:', newRecord.id, 'checksum:', newRecord.checksum, 'checksumLastParsed:', newRecord.checksumLastParsed);
+      if (postParseCallback) {
+        postParseCallback(newRecord);
+      }
+      return;
+    }
+    
+    console.log('Proceeding with parsing for record:', newRecord.id, 'hasJson:', hasJson, 'checksumMatch:', checksumMatch, 'checksum:', newRecord.checksum, 'checksumLastParsed:', newRecord.checksumLastParsed);
+    
+    // Use shared helper to check for ongoing operations
+    const operationCheck = await checkOngoingOperation(newRecord.id, RegisteredOperations.Parse);
+    
+    if (operationCheck.hasOngoingOperation) {
+      if (operationCheck.isDifferentSession) {
+        // Operation is from different session, show message and return
+        await updateOperationProgress(newRecord, RegisteredOperations.Parse, true, 0, 0, 0, 0, { 
+          message: 'Parse process started on ' + operationCheck.operation?.operationStartedOnUserAgent + ' last data chunk received on ' + operationCheck.operation?.operationLastStep, 
+          processedOnDifferentDevice: true 
+        });
+        return;
+      } else if (operationCheck.shouldResume) {
+        // Same session, operation can be resumed - continue to add to queue
+        console.log('Resuming existing parse operation for record:', newRecord.id);
       }
     } else {
       // No ongoing operation, create a lock
-      await operationsApi.create({
-        id: undefined,
-        recordId: newRecord.id,
-        operationId: `parse-${newRecord.id}`,
-        operationName: RegisteredOperations.Parse,
-        operationProgress: 0,
-        operationProgressOf: 0,
-        operationPage: 0,
-        operationPages: 0,
-        operationMessage: null,
-        operationTextDelta: null,
-        operationPageDelta: null,
-        operationRecordText: null,
-        operationStartedOn: new Date().toISOString(),
-        operationStartedOnUserAgent: navigator.userAgent,
-        operationStartedOnSessionId: dbContext?.authorizedSessionId || null,
-        operationLastStep: new Date().toISOString(),
-        operationLastStepUserAgent: navigator.userAgent,
-        operationLastStepSessionId: dbContext?.authorizedSessionId || null
-      });
+      await createOperationLock(newRecord.id, RegisteredOperations.Parse);
     }
+    
     if (!parseQueue.find(pr => pr.id === newRecord.id) && (newRecord.attachments.length > 0 || newRecord.transcription)) {
       if (postParseCallback) {
         newRecord.postParseCallback = postParseCallback;
@@ -1244,7 +1447,21 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
   const sendRecordToChat = async (record: Record, forceRefresh: boolean = false) => {
     if (!record.json || forceRefresh) {  // first: parse the record
-      await parseRecord(record);
+      // Only parse user-uploaded records
+      if (isUserUploadedRecord(record)) {
+        await parseRecord(record);
+      } else {
+        console.log('Skipping parse for non-user-uploaded record in chat:', record.id);
+        // Still send to chat even if not parsed
+        chatContext.setChatOpen(true);
+        chatContext.sendMessage({
+          message: {
+            role: 'user',
+            createdAt: new Date(),
+            content: prompts.recordIntoChat({ record, config }),
+          }
+        });
+      }
     } else {
       chatContext.setChatOpen(true);
       chatContext.sendMessage({

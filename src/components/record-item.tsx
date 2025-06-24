@@ -20,7 +20,7 @@ import { DatabaseContext } from "@/contexts/db-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import ZoomableImage from './zoomable-image';
-import { convertRecordIdsToLinks } from '@/lib/utils';
+import { convertRecordIdsToLinks, isIOS } from '@/lib/utils';
 import showdown from 'showdown';
 import { Accordion, AccordionTrigger, AccordionContent, AccordionItem } from "./ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
@@ -454,7 +454,7 @@ useEffect(() => {
                 </div>
               )}
 
-              {record.attachments.length > 0 && (
+              {record.attachments.length > 0 && !isIOS() && ( // TODO: fix this for iOS - we need to download decrypted attachments on iOS
                 <div className="mt-2 flex flex-wrap items-center gap-2 w-full">
                   {record.attachments.map((attachment, index) => (
                     <div key={index} className="text-sm inline-flex w-auto">

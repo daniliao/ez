@@ -267,7 +267,6 @@ export class Record {
         console.log('Checksum updated ', this.id, this.checksum);
     }
     async updateChecksumLastParsed(): Promise<void> {
-        this.checksum = (await this.attachmentsKey())  + (this.transcription  ? await sha256(this.transcription ? this.transcription : '', 'transcription') : '');
         this.checksumLastParsed = (await this.attachmentsKey()) + (this.transcription  ? await sha256(this.transcription ? this.transcription : '', 'transcription') : '');
         console.log('Checksum last parsed updated ', this.id, this.checksumLastParsed);
     }

@@ -9,6 +9,7 @@ import { ZodIssue } from 'zod';
 import { SaaSContext } from './saas-context';
 import { generateTimeBasedPassword } from '@/lib/totp';
 import { jwtVerify } from 'jose';
+import { nanoid } from 'nanoid';
 const argon2 = require("argon2-browser");
 
 // the salts are static as they're used as record locators in the DB - once changed the whole DB needs to be re-hashed
@@ -50,6 +51,8 @@ export type DatabaseContextType = {
     acl: KeyACL | null;
     setACL: (acl: KeyACL | null) => void;
 
+    authorizedSessionId: string;
+    setAuthorizedSessionId: (sessionId: string) => void;    
 
     databaseHashId: string;
     setDatabaseHashId: (hashId: string) => void;
@@ -110,6 +113,7 @@ export const DatabaseContextProvider: React.FC<PropsWithChildren> = ({ children 
     const [accessToken, setAccesToken] = useState<string>('');
     const [refreshToken, setRefreshToken] = useState<string>('');
     const [authStatus, setAuthStatus] = useState<DatabaseAuthStatus>(DatabaseAuthStatus.NotAuthorized);
+    const [authorizedSessionId, setAuthorizedSessionId] = useState<string>('');
     const saasContext = useContext(SaaSContext);
 
     const setupApiClient = async (config: ConfigContextType | null) => {
@@ -275,11 +279,16 @@ export const DatabaseContextProvider: React.FC<PropsWithChildren> = ({ children 
                     }
                 }
 
+                if (!sessionStorage.getItem('authorizedSessionId')) {
+                    sessionStorage.setItem('authorizedSessionId', nanoid());
+                }
+
                 setDatabaseHashId(databaseIdHash);
                 setDatabaseId(authorizeRequest.databaseId);
                 setKeyLocatorHash(keyLocatorHash);
                 setKeyHash(keyHash.encoded);
                 setKeyHashParams(keyHashParams);
+                setAuthorizedSessionId(sessionStorage.getItem('authorizedSessionId') || '');
 
                 const encryptedMasterKey = (authResponse as AuthorizeDbResponse).data.encryptedMasterKey;
                 setMasterKey((await encryptionUtils.decrypt(encryptedMasterKey)).trim());
@@ -338,8 +347,27 @@ export const DatabaseContextProvider: React.FC<PropsWithChildren> = ({ children 
 
     // time based, temporary key for server communication
     const getServerCommunicationKey = async () => {
-        const decoded = await jwtVerify(accessToken, new TextEncoder().encode(process.env.NEXT_PUBLIC_TOKEN_SECRET || 'Jeipho7ahchue4ahhohsoo3jahmui6Ap'));
-        return decoded.payload.serverCommunicationKey as string;
+        try {
+            const decoded = await jwtVerify(accessToken, new TextEncoder().encode(process.env.NEXT_PUBLIC_TOKEN_SECRET || 'Jeipho7ahchue4ahhohsoo3jahmui6Ap'));
+            return decoded.payload.serverCommunicationKey as string;
+        } catch (error) {            
+            // Try to refresh the token
+            if (refreshToken) {
+                try {
+                    const refreshResult = await refresh({ refreshToken });
+                    if (refreshResult.success && refreshResult.accessToken) {
+                        // Retry with the new access token
+                        const decoded = await jwtVerify(refreshResult.accessToken, new TextEncoder().encode(process.env.NEXT_PUBLIC_TOKEN_SECRET || 'Jeipho7ahchue4ahhohsoo3jahmui6Ap'));
+                        return decoded.payload.serverCommunicationKey as string;
+                    }
+                } catch (refreshError) {
+                    console.error('Token refresh failed:', refreshError);
+                }
+            }
+            
+            // If refresh fails or no refresh token, throw the original error
+            throw error;
+        }
     }
 
     const databaseContextValue: DatabaseContextType = {
@@ -371,7 +399,9 @@ export const DatabaseContextProvider: React.FC<PropsWithChildren> = ({ children 
         acl,
         setACL,
         featureFlags,
-        getServerCommunicationKey
+        getServerCommunicationKey,
+        authorizedSessionId,
+        setAuthorizedSessionId
     };
 
     return (

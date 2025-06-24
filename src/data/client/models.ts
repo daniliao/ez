@@ -169,12 +169,14 @@ export type PostParseCallback = (record: Record) => Promise<void>;
 export type OperationProgress = {
     page: number;
     pages: number;
-    operationName: string;
+    operationName?: string;
     progress: number;
     progressOf: number;
     textDelta?: string;
     pageDelta?: string;
     recordText?: string;
+    processedOnDifferentDevice?: boolean;
+    message?: string;
 }
 export class Record {
     id?: number;
@@ -265,7 +267,6 @@ export class Record {
         console.log('Checksum updated ', this.id, this.checksum);
     }
     async updateChecksumLastParsed(): Promise<void> {
-        this.checksum = (await this.attachmentsKey())  + (this.transcription  ? await sha256(this.transcription ? this.transcription : '', 'transcription') : '');
         this.checksumLastParsed = (await this.attachmentsKey()) + (this.transcription  ? await sha256(this.transcription ? this.transcription : '', 'transcription') : '');
         console.log('Checksum last parsed updated ', this.id, this.checksumLastParsed);
     }

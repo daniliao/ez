@@ -62,10 +62,13 @@ export async function parseWithAIDirectCall({
             // After streaming is done
             record = await updateOperationProgress(record, RegisteredOperations.Parse, false, chunkIndex, totalTokensEstimage, 0, 0, { recordText: content, pageDelta: content }, null);
             await record.updateChecksumLastParsed();
-            const updatedRecord = await updateRecordFromText(content, record, false);
+            let updatedRecord = await updateRecordFromText(content, record, false);
             if (updatedRecord) {
+                updatedRecord = await updateOperationProgress(record, RegisteredOperations.Parse, false, chunkIndex, chunkIndex, 0, 0, { recordText: content, pageDelta: content }, null);
+
                 resolve(updatedRecord);
             } else {
+                await updateOperationProgress(record, RegisteredOperations.Parse, false, chunkIndex, chunkIndex, 0, 0, { recordText: content, pageDelta: content }, new Error('Failed to update record'));
                 reject(new Error('Failed to update record'));
             }
         } catch (err) {

@@ -5,6 +5,7 @@ import { getCurrentTS } from "@/lib/utils";
 import { records } from "./db-schema";
 import { eq } from "drizzle-orm";
 import { create } from "./generic-repository";
+import { desc, asc } from 'drizzle-orm';
 
 export default class ServerRecordRepository extends BaseRepository<RecordDTO> {
     
@@ -42,5 +43,17 @@ export default class ServerRecordRepository extends BaseRepository<RecordDTO> {
             }
         }
         return Promise.resolve(dbQuery.all() as RecordDTO[])
+    }
+
+    async getLastUpdateDate(folderId: number): Promise<string | null> {
+        const db = (await this.db());
+        const result = db.select({ updatedAt: records.updatedAt })
+            .from(records)
+            .where(eq(records.folderId, folderId))
+            .orderBy(desc(records.updatedAt))
+            .limit(1)
+            .get() as { updatedAt: string } | undefined;
+        
+        return result?.updatedAt || null;
     }
 }

@@ -88,6 +88,120 @@ type FileUploaderProps = {
   orientation?: "horizontal" | "vertical";
 };
 
+// File validation functions
+const validateImageFile = async (file: File): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      // Check if image has valid dimensions (not 0x0)
+      if (img.width > 0 && img.height > 0) {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(false);
+    };
+    
+    img.src = url;
+  });
+};
+
+const validatePdfFile = async (file: File): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      const arr = new Uint8Array(e.target?.result as ArrayBuffer);
+      
+      // Check for PDF magic number: %PDF (25 50 44 46 in hex)
+      if (arr.length >= 4 && 
+          arr[0] === 0x25 && // %
+          arr[1] === 0x50 && // P
+          arr[2] === 0x44 && // D
+          arr[3] === 0x46) { // F
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    };
+    
+    reader.onerror = () => {
+      resolve(false);
+    };
+    
+    // Only read the first 4 bytes to check the magic number
+    reader.readAsArrayBuffer(file.slice(0, 4));
+  });
+};
+
+// Helper function to get user-friendly file type description
+const getFileTypeDescription = (fileType: string): string => {
+  const typeMap: { [key: string]: string } = {
+    'image/jpeg': 'JPEG image',
+    'image/jpg': 'JPEG image',
+    'image/png': 'PNG image',
+    'image/gif': 'GIF image',
+    'image/webp': 'WebP image',
+    'image/bmp': 'BMP image',
+    'image/tiff': 'TIFF image',
+    'application/pdf': 'PDF document'
+  };
+  
+  return typeMap[fileType] || fileType;
+};
+
+const validateFileContent = async (file: File): Promise<{ isValid: boolean; error?: string }> => {
+  const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff'];
+  const validPdfType = 'application/pdf';
+  
+  // Check MIME type first
+  if (!validImageTypes.includes(file.type) && file.type !== validPdfType) {
+    return { isValid: false, error: `Invalid file type: ${getFileTypeDescription(file.type)}. Only images (JPEG, PNG, GIF, WebP, BMP, TIFF) and PDF files are allowed.` };
+  }
+  
+  // Check file extension
+  const fileName = file.name.toLowerCase();
+  const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif', '.pdf'];
+  const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+  
+  if (!hasValidExtension) {
+    return { isValid: false, error: `Invalid file extension. Only images (JPEG, PNG, GIF, WebP, BMP, TIFF) and PDF files are allowed.` };
+  }
+  
+  // Check file size (additional safety check)
+  const maxSizeBytes = 200 * 1024 * 1024; // 200MB
+  if (file.size > maxSizeBytes) {
+    return { isValid: false, error: `File is too large. Maximum size is ${maxSizeBytes / 1024 / 1024}MB.` };
+  }
+  
+  // Check if file is empty
+  if (file.size === 0) {
+    return { isValid: false, error: 'File is empty. Please select a valid file.' };
+  }
+  
+  // Validate content based on file type
+  if (validImageTypes.includes(file.type)) {
+    const isValidImage = await validateImageFile(file);
+    if (!isValidImage) {
+      return { isValid: false, error: 'Invalid image file. The file appears to be corrupted or not a valid image.' };
+    }
+  } else if (file.type === validPdfType) {
+    const isValidPdf = await validatePdfFile(file);
+    if (!isValidPdf) {
+      return { isValid: false, error: 'Invalid PDF file. The file appears to be corrupted or not a valid PDF.' };
+    }
+  }
+  
+  return { isValid: true };
+};
+
 export const EncryptedAttachmentUploader = forwardRef<
   HTMLDivElement,
   FileUploaderProps & React.HTMLAttributes<HTMLDivElement>
@@ -121,7 +235,8 @@ export const EncryptedAttachmentUploader = forwardRef<
     const saasContext = useContext(SaaSContext);
     const {
       accept = {
-        "image/*": [".jpg", ".jpeg", ".png", ".pdf"],
+        "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif"],
+        "application/pdf": [".pdf"],
       },
       maxFiles = 1,
       maxSize = 4 * 1024 * 1024,
@@ -130,6 +245,34 @@ export const EncryptedAttachmentUploader = forwardRef<
 
     const reSelectAll = maxFiles === 1 ? true : reSelect;
     const direction: DirectionOptions = dir === "rtl" ? "rtl" : "ltr";
+
+    // Custom validator function for dropzone
+    const validateFile = useCallback((file: File) => {
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff'];
+      const validPdfType = 'application/pdf';
+      
+      // Check MIME type
+      if (!validImageTypes.includes(file.type) && file.type !== validPdfType) {
+        return {
+          code: "file-invalid-type",
+          message: `Invalid file type: ${getFileTypeDescription(file.type)}. Only images (JPEG, PNG, GIF, WebP, BMP, TIFF) and PDF files are allowed.`
+        };
+      }
+      
+      // Check file extension
+      const fileName = file.name.toLowerCase();
+      const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif', '.pdf'];
+      const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!hasValidExtension) {
+        return {
+          code: "file-invalid-type",
+          message: `Invalid file extension. Only images (JPEG, PNG, GIF, WebP, BMP, TIFF) and PDF files are allowed.`
+        };
+      }
+      
+      return null;
+    }, []);
 
     const updateFile = useCallback((file: UploadedFile, allFiles: UploadedFile[]) => {
       if(value) onValueChange(allFiles.map((f) => (f.index === file.index ? file : f)));
@@ -303,11 +446,36 @@ export const EncryptedAttachmentUploader = forwardRef<
   }
 
     const onDrop = useCallback(
-      (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
+      async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
         const files = acceptedFiles;
 
         if (!files) {
           toast.error("file error , probably too big");
+          return;
+        }
+
+        // Validate all files before processing
+        const validatedFiles: File[] = [];
+        const invalidFiles: { file: File; error: string }[] = [];
+
+        for (const file of files) {
+          const validation = await validateFileContent(file);
+          if (validation.isValid) {
+            validatedFiles.push(file);
+          } else {
+            invalidFiles.push({ file, error: validation.error! });
+          }
+        }
+
+        // Show errors for invalid files
+        if (invalidFiles.length > 0) {
+          invalidFiles.forEach(({ file, error }) => {
+            toast.error(`${file.name}: ${error}`);
+          });
+        }
+
+        // If no valid files, return early
+        if (validatedFiles.length === 0) {
           return;
         }
 
@@ -320,7 +488,7 @@ export const EncryptedAttachmentUploader = forwardRef<
         let maxIdx = newValues.map((f) => f.index).reduce((a, b) => Math.max(a, b), -1);
         let idx = maxIdx + 1;
         const filesToBeUploaded:UploadedFile[] = []
-        files.forEach((file) => {
+        validatedFiles.forEach((file) => {
           if (newValues.find((f) => f.file.name === file.name) !== undefined) { // change the file name
             file = new File([file], ensureUniqueFileName(file.name, idx) , { type: file.type });
           }
@@ -380,6 +548,7 @@ export const EncryptedAttachmentUploader = forwardRef<
       onDrop,
       onDropRejected: () => setIsFileTooBig(true),
       onDropAccepted: () => setIsFileTooBig(false),
+      validator: validateFile,
     });
 
     return (

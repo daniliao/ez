@@ -6,6 +6,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Detect iOS
+export function isIOS(): boolean {
+  console.log('isIOS', typeof window, navigator.userAgent);
+  if (typeof window === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
 
 type ErrorWithMessage = {
 	message: string

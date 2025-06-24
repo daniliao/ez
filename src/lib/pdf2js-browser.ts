@@ -1,15 +1,10 @@
 import { PdfConversionApiClient } from '@/data/client/pdf-conversion-api-client';
 import { DatabaseContext } from '@/contexts/db-context';
 import { SaaSContext } from '@/contexts/saas-context';
+import { isIOS } from './utils';
 
 const MAX_CANVAS_PIXELS = 16_777_216;
 
-// Detect iOS
-function isIOS(): boolean {
-  console.log('isIOS', typeof window, navigator.userAgent);
-  if (typeof window === 'undefined') return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-}
 
 /**
  * Validates if the provided data is a valid PDF by checking the file header

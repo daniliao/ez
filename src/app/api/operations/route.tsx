@@ -10,10 +10,12 @@ export async function GET(request: NextRequest, response: NextResponse) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const recordId = searchParams.get('recordId');
+    const recordIds = searchParams.get('recordIds');
     const operationId = searchParams.get('operationId');
     let filter: any = {};
     if (id) filter.id = id;
     if (recordId) filter.recordId = recordId;
+    if (recordIds) filter.recordIds = recordIds.split(',').map(id => id.trim());
     if (operationId) filter.operationId = operationId;
     const data = await repo.findAll({ filter });
     return Response.json({

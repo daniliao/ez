@@ -13,17 +13,20 @@ export async function GET(request: NextRequest, response: NextResponse) {
     
     try {
         const repo = new ServerRecordRepository(requestContext.databaseIdHash);
-        const lastUpdateDate = await repo.getLastUpdateDate(parseInt(folderId));
+        const lastUpdateInfo = await repo.getLastUpdateDate(parseInt(folderId));
         
         return Response.json({
-            message: "Last update date retrieved successfully",
-            data: { lastUpdateDate },
+            message: "Last update info retrieved successfully",
+            data: { 
+                lastUpdateDate: lastUpdateInfo?.updatedAt || null,
+                recordId: lastUpdateInfo?.recordId || null
+            },
             status: 200
         });
     } catch (error) {
-        console.error('Error getting last update date:', error);
+        console.error('Error getting last update info:', error);
         return Response.json({ 
-            message: "Error getting last update date", 
+            message: "Error getting last update info", 
             status: 500 
         }, { status: 500 });
     }

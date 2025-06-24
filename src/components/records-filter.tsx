@@ -20,9 +20,9 @@ export default function RecordsFilter({}) {
     const recordContext = useContext(RecordContext);
     const folderContext = useContext(FolderContext);
 
-    const handleRefresh = () => {
+    const handleRefresh = async () => {
         if (folderContext?.currentFolder && recordContext?.checkAndRefreshRecords) {
-            recordContext.checkAndRefreshRecords(folderContext.currentFolder);
+            await recordContext.checkAndRefreshRecords(folderContext.currentFolder);
         }
     };
 

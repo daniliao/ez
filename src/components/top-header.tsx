@@ -30,6 +30,7 @@ import FeedbackWidget from "./feedback-widget";
 import { SaaSContextLoader } from "./saas-context-loader";
 import TranslationBenchmarkPopup from "./translation-benchmark-popup";
 import ParsingProgressDialog from '@/components/ParsingProgressDialog';
+import { isIOS } from "@/lib/utils";
 
 export default function TopHeader() {
     const folderContext = useContext(FolderContext);
@@ -112,12 +113,14 @@ export default function TopHeader() {
                     {!dbContext?.acl || dbContext.acl.role === 'owner' ? (<CommandItem key="cmd-share" className="cursor-pointer text-xs" onSelect={(v) => { keyContext.setSharedKeysDialogOpen(true);  }}><Share2Icon className="w-6 h-6" />  Shared Keys</CommandItem>) : null}
                     <CommandItem key="cmd-translation-benchmark" className="cursor-pointer text-xs" onSelect={(v) => { setTranslationBenchmarkOpen(true); }}><LanguagesIcon className="w-6 h-6" /> Translation benchmarking report</CommandItem>
                   </CommandGroup>
+                  {!isIOS() ? (
                   <CommandGroup heading="Export & import">
                     <CommandItem key="cmd-export" className="cursor-pointer text-xs" onSelect={(v) => { recordContext?.exportRecords(); }}><SaveAllIcon className="w-6 h-6" /> Export filtered records</CommandItem>
                     <CommandItem key="cmd-import" className="cursor-pointer text-xs" onSelect={(v) => { 
                         openFilePicker();
                       }}><ImportIcon className="w-6 h-6" /> Import records</CommandItem>
-                  </CommandGroup>                  
+                  </CommandGroup>
+                  ) : null}
                   <CommandGroup heading="Security">
                     <CommandItem key="cmd-security-report" className="cursor-pointer text-xs" onSelect={(v) => { window.open('mailto:info@catchthetornado.com?subject=' + encodeURIComponent('Security incident report for ' + dbContext?.databaseHashId)) }}><FormInputIcon className="w-6 h-6" /> Report incident</CommandItem>
                     <CommandItem key="cmd-security-close-account" className="cursor-pointer text-xs" onSelect={(v) => { window.open('mailto:info@catchthetornado.com?subject=' + encodeURIComponent('Close account request for ' + dbContext?.databaseHashId)) }}><FormInputIcon className="w-6 h-6" /> Close account</CommandItem>

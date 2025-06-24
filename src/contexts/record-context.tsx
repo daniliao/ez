@@ -684,6 +684,34 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     return new OperationsApiClient('', dbContext, saasContext, { useEncryption: false });
   };
 
+  // Helper to send operation progress update (fire-and-forget)
+  const sendOperationProgressUpdate = (record: Record, operation: string, progress: number, progressOf: number, page: number, pages: number, metadata: any) => {
+    if (typeof record.id !== 'number') return;
+    const operationsApi = getOperationsApiClient();
+    const operationId = `parse-${record.id}`;
+    const operationDTO = {
+      id: undefined,
+      recordId: record.id,
+      operationId,
+      operationName: operation,
+      operationProgress: progress,
+      operationProgressOf: progressOf,
+      operationPage: page,
+      operationPages: pages,
+      operationMessage: metadata?.message || null,
+      operationTextDelta: metadata?.textDelta || null,
+      operationPageDelta: metadata?.pageDelta || null,
+      operationRecordText: metadata?.recordText || null,
+      operationStartedOn: new Date().toISOString(),
+      operationStartedOnUserAgent: navigator.userAgent,
+      operationStartedOnSessionId: dbContext?.authorizedSessionId || null,
+      operationLastStep: new Date().toISOString(),
+      operationLastStepUserAgent: navigator.userAgent,
+      operationLastStepSessionId: dbContext?.authorizedSessionId || null
+    };
+    operationsApi.update(operationDTO); // fire-and-forget
+  };
+
   const updateOperationProgress = async (record: Record, operation: string, inProgress: boolean, progress: number = 0, progressOf: number = 0, page: number = 0, pages: number = 0, metadata: any = null, error: any = null): Promise<Record> => {
 
 
@@ -692,7 +720,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     record.operationError = error;
 
     if (inProgress !== record.operationInProgress || error !== record.operationError) {
-     setRecords(prevRecords => prevRecords.map(pr => pr.id === record.id ? record : pr)); // update state - is set by updateRecord anyways
+      setRecords(prevRecords => {
+        const updated = prevRecords.map(pr => pr.id === record.id ? record : pr);
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata);
+        return updated;
+      });
     }
 
 
@@ -728,6 +760,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         }
 
         record = await updateRecord(record);
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata);
+      }
+      // Fire every 10 tokens in between
+      if (progress % 10 === 0) {
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata);
       }
     }
 
@@ -756,32 +793,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         }
       };
     });
-
-    // Send progress update to operations API
-    const operationsApi = getOperationsApiClient();
-    if (typeof record.id !== 'number') return record; // cannot update operation without recordId
-    const operationId = `parse-${record.id}`;
-    const operationDTO = {
-      id: undefined,
-      recordId: record.id,
-      operationId,
-      operationName: operation,
-      operationProgress: progress,
-      operationProgressOf: progressOf,
-      operationPage: page,
-      operationPages: pages,
-      operationMessage: metadata?.message || null,
-      operationTextDelta: metadata?.textDelta || null,
-      operationPageDelta: metadata?.pageDelta || null,
-      operationRecordText: metadata?.recordText || null,
-      operationStartedOn: new Date().toISOString(),
-      operationStartedOnUserAgent: navigator.userAgent,
-      operationStartedOnSessionId: dbContext?.authorizedSessionId || null,
-      operationLastStep: new Date().toISOString(),
-      operationLastStepUserAgent: navigator.userAgent,
-      operationLastStepSessionId: dbContext?.authorizedSessionId || null
-    };
-    await operationsApi.update(operationDTO);
 
     return record;
   }

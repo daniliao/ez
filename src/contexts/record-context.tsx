@@ -721,6 +721,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     record.operationName = operation;
 
     if (inProgress !== record.operationInProgress || error !== record.operationError) {
+      record.operationInProgress = inProgress;
+
       setRecords(prevRecords => {
         const updated = prevRecords.map(pr => pr.id === record.id ? record : pr);
         sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, progress > 0 && progressOf > 0, error !== null, error ? getErrorMessage(error) : null);
@@ -728,13 +730,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       });
     }
 
-    record.operationInProgress = inProgress;
     record.operationError = error;
 
-
-    if (progress === 0) {
-      console.log('Progress is 0, skipping', progress, progressOf, page, pages, metadata, error);
-    }
 
     if (progress > 0 && progressOf > 0) {
 

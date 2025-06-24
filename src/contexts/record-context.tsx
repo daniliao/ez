@@ -555,9 +555,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       // Auto-parse records that need parsing
       await autoParseRecords(recordsWithOperationStatus);
       
-      // Also check for operation progress updates to show progress across sessions
-      await checkOperationProgressUpdates();
-      
       return recordsWithOperationStatus;
     } catch (error) {
       setLoaderStatus(DataLoadingStatus.Error);
@@ -679,8 +676,14 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       const operationsApi = getOperationsApiClient();
       const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
       
-      // Get all recent operations
-      const response = await operationsApi.get({});
+      // Get record IDs that are currently in the list
+      const recordIds = records.map(record => record.id).filter(id => id !== undefined) as number[];
+      
+      if (recordIds.length === 0) return;
+      
+      // Fetch operations for all records in a single request
+      const response = await operationsApi.get({ recordIds });
+
       if ('data' in response && Array.isArray(response.data)) {
         const recentOperations = response.data.filter(op => 
           op.operationLastStep && 
@@ -1745,63 +1748,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       }
     } catch (error) {
       console.error('Error checking for updates:', error);
-    }
-  };
-
-  // Helper to check operation progress updates without refreshing records
-  const checkOperationProgressUpdates = async () => {
-    try {
-      const operationsApi = getOperationsApiClient();
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-      
-      // Get record IDs that are currently in the list
-      const recordIds = records.map(record => record.id).filter(id => id !== undefined) as number[];
-      
-      if (recordIds.length === 0) return;
-      
-      // Fetch operations for all records in a single request
-      const response = await operationsApi.get({ recordIds });
-      if ('data' in response && Array.isArray(response.data)) {
-        const recentOperations = response.data.filter(op => 
-          op.operationLastStep && 
-          new Date(op.operationLastStep) > new Date(twoMinutesAgo) &&
-          !op.operationFinished &&
-          !op.operationErrored &&
-          // Only process operations running on different devices (different session)
-          op.operationLastStepSessionId && 
-          op.operationLastStepSessionId !== dbContext?.authorizedSessionId
-        );
-        
-        // Update operation progress state only for operations on different devices
-        recentOperations.forEach(operation => {
-          const record = records.find(r => r.id === operation.recordId);
-          if (record) {
-            const updatedRecord = new Record(record);
-            updatedRecord.operationInProgress = true;
-            
-            const message = `Operation started on ${operation.operationStartedOnUserAgent} last data chunk received on ${operation.operationLastStep}`;
-            
-            // Update operation progress state with processedOnDifferentDevice flag
-            updateOperationProgressState(
-              updatedRecord, 
-              operation.operationName || 'unknown', 
-              operation.operationProgress || 0, 
-              operation.operationProgressOf || 0, 
-              operation.operationPage || 0, 
-              operation.operationPages || 0, 
-              { 
-                message, 
-                processedOnDifferentDevice: true,
-                textDelta: operation.operationTextDelta || '',
-                pageDelta: operation.operationPageDelta || '',
-                recordText: operation.operationRecordText || ''
-              }
-            );
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error checking operation progress updates:', error);
     }
   };
 

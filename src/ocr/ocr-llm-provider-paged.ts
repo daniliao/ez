@@ -107,13 +107,14 @@ export async function parse(record: Record, chatContext: ChatContextType, config
             await record.updateChecksumLastParsed();
 
             let updatedRecord = await updateRecordFromText(fullTextToProcess, record, false);
-            updatedRecord = await updateOperationProgress(updatedRecord as Record, RegisteredOperations.Parse, false, totalProgressOfInTokens, totalProgressOfInTokens, pages, pages, { recordText: fullTextToProcess }, null);
 
 
 
             if (updatedRecord) {
+                updatedRecord = await updateOperationProgress(updatedRecord as Record, RegisteredOperations.Parse, false, totalProgressOfInTokens, totalProgressOfInTokens, pages, pages, { recordText: fullTextToProcess }, null);
                 resolve(updatedRecord);
             } else {
+                await updateOperationProgress(record, RegisteredOperations.Parse, false, totalProgressOfInTokens, totalProgressOfInTokens, pages, pages, { recordText: fullTextToProcess }, new Error('Failed to update record'));
                 reject(new Error('Failed to update record'));
             }
 

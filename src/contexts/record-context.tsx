@@ -719,18 +719,22 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
 
     record.operationName = operation;
-    record.operationInProgress = inProgress;
-    record.operationError = error;
 
     if (inProgress !== record.operationInProgress || error !== record.operationError) {
       setRecords(prevRecords => {
         const updated = prevRecords.map(pr => pr.id === record.id ? record : pr);
-        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, progress > 0 && progressOf > 0, error !== null, getErrorMessage(error));
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, progress > 0 && progressOf > 0, error !== null, error ? getErrorMessage(error) : null);
         return updated;
       });
     }
 
+    record.operationInProgress = inProgress;
+    record.operationError = error;
 
+
+    if (progress === 0) {
+      console.log('Progress is 0, skipping', progress, progressOf, page, pages, metadata, error);
+    }
 
     if (progress > 0 && progressOf > 0) {
 
@@ -755,7 +759,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         record.text = metadata.recordText;
         record = await setRecordExtra(record, 'Page ' + page.toString() + ' content', metadata.pageDelta, false); // update the record parse progress
 
-        if (progress === (progressOf - 1)) {
+        if (progress >= (progressOf - 1)) {
           removeRecordExtra(record, 'Document parsed pages', false);
         } else {
           record = await setRecordExtra(record, 'Document parsed pages', page.toString(), false); // update the record parse progress
@@ -771,31 +775,33 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       }
     }
 
-    // Save parsing progress in context state
-    setOperationProgressByRecordId(prev => {
-      const id = record.id?.toString() || 'unknown';
-      const prevHistory = prev[id]?.history || [];
-      return {
-        ...prev,
-        [id]: {
-          operationName: operation,
-          progress,
-          progressOf,
-          page,
-          pages,
-          message: metadata?.message,
-          processedOnDifferentDevice: metadata?.processedOnDifferentDevice || false,
-          metadata,
-          textDelta: (prev[id]?.textDelta || '') + (metadata?.textDelta || ''),
-          pageDelta: metadata?.pageDelta || '',
-          recordText: metadata?.recordText || '',
-          history: [
-            ...prevHistory,
-            { operationName: operation, progress, progressOf, metadata, page, pages, processedOnDifferentDevice: metadata?.processedOnDifferentDevice || false, message: metadata?.message, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
-          ]
-        }
-      };
-    });
+    if (progress > 0 && progressOf > 0 || error !== null || metadata?.message) {
+      // Save parsing progress in context state
+      setOperationProgressByRecordId(prev => {
+        const id = record.id?.toString() || 'unknown';
+        const prevHistory = prev[id]?.history || [];
+        return {
+          ...prev,
+          [id]: {
+            operationName: operation,
+            progress,
+            progressOf,
+            page,
+            pages,
+            message: metadata?.message,
+            processedOnDifferentDevice: metadata?.processedOnDifferentDevice || false,
+            metadata,
+            textDelta: (prev[id]?.textDelta || '') + (metadata?.textDelta || ''),
+            pageDelta: metadata?.pageDelta || '',
+            recordText: metadata?.recordText || '',
+            history: [
+              ...prevHistory,
+              { operationName: operation, progress, progressOf, metadata, page, pages, processedOnDifferentDevice: metadata?.processedOnDifferentDevice || false, message: metadata?.message, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
+            ]
+          }
+        };
+      });
+    }
 
     return record;
   }
@@ -1304,7 +1310,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         setRecordDialogOpen,
         setRecordExtra,
         removeRecordExtra,
-        setOperationProgressByRecordId,
         translateRecord,
         operationProgressByRecordId,
         parsingDialogOpen,

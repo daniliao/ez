@@ -57,10 +57,11 @@ export const prompts = {
                 Return only markdown text of this document with no additions, comments, no intros no other answers. Just exact text. \
                 Resulting document should be in the same language as the original document. \
                 Do not add any terms or words that are not in the text. \
-                attachments to text. One attachment is a one page of the record. Include page numbers in markdown.  Please use markdown to format it nicely and return after JSON object'
+                attachments to text. One attachment is a one page of the record. Include page numbers in markdown.  Please use markdown to format it nicely and return after JSON object.'
     }, 
     recordParseMetadata: (context: ParseSinglePagePromptContext & { recordContent?: string }) => {
         return 'Parse this medical record data text to JSON array of records including all findings, records, details, tests results, medications, diagnosis and others with the schema defined below. \
+        If this page DOES NOT CONTAIN ANY HEALTH DATA, return ```json { error: "No health data found" }```. \
         First: JSON should be all in original language. \
         Each medical record should be a row of returned JSON array of objects in format given below. \
         First element of an array should be for metadata of all pages processed - and an overall summary of all items. \

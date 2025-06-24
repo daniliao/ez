@@ -121,7 +121,8 @@ export const EncryptedAttachmentUploader = forwardRef<
     const saasContext = useContext(SaaSContext);
     const {
       accept = {
-        "image/*": [".jpg", ".jpeg", ".png", ".pdf"],
+        "image/*": [],
+        "application/pdf": [".pdf"],
       },
       maxFiles = 1,
       maxSize = 4 * 1024 * 1024,

@@ -594,14 +594,6 @@ useEffect(() => {
           <Button size="icon" variant="ghost" title="Download record as HTML" onClick={() => downloadAsHtml(record.text || record.description, `record-${record.id}`)}>
             <DownloadIcon className="w-4 h-4" />
           </Button>
-          <Button size="icon" variant="ghost" title="Parse record" onClick={async () => {
-            if (record.operationInProgress) {
-              toast.info('Record parsing already in progress');
-              return;
-            }
-          }}>
-            <FileText className="w-4 h-4" />
-          </Button>
           <Button 
             size="icon" 
             variant="ghost" 

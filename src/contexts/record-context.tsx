@@ -704,7 +704,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                 hasOngoingOperation: true,
                 isDifferentSession: operation.operationLastStepSessionId && operation.operationLastStepSessionId !== dbContext?.authorizedSessionId,
                 operation: operation,
-                shouldResume: operation.operationName === RegisteredOperations.Parse && operation.operationLastStepSessionId === dbContext?.authorizedSessionId
+                shouldResume: (operation.operationName === RegisteredOperations.Parse || operation.operationName === RegisteredOperations.Translate) && operation.operationLastStepSessionId === dbContext?.authorizedSessionId
               };
               
               if (operationCheck.isDifferentSession) {
@@ -744,16 +744,27 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
                   }
                 );
                 
-                // Resume parsing for records that are in progress but not finished and belong to current session
+                // Resume operations for records that are in progress but not finished and belong to current session
                 if (operationCheck.shouldResume) {
-                  console.log('Resuming parsing for record:', record.id, 'from same session');
-                  
-                  // Check if record is not already in parse queue
-                  if (!parseQueue.find(pr => pr.id === record.id)) {
-                    // Add to parse queue to resume parsing
-                    parseQueue.push(updatedRecord);
-                    parseQueueLength = parseQueue.length;
-                    console.log('Added to parse queue for resuming: ', parseQueue.length);
+                  if (operation.operationName === RegisteredOperations.Parse) {
+                    console.log('Resuming parsing for record:', record.id, 'from same session');
+                    
+                    // Check if record is not already in parse queue
+                    if (!parseQueue.find(pr => pr.id === record.id)) {
+                      // Add to parse queue to resume parsing
+                      parseQueue.push(updatedRecord);
+                      parseQueueLength = parseQueue.length;
+                      console.log('Added to parse queue for resuming: ', parseQueue.length);
+                    }
+                  } else if (operation.operationName === RegisteredOperations.Translate) {
+                    console.log('Resuming translation for record:', record.id, 'from same session');
+                    
+                    // Resume translation by calling translateRecord (fire and forget)
+                    translateRecord(updatedRecord).then(() => {
+                      console.log('Translation resumed and completed for record:', record.id);
+                    }).catch((error) => {
+                      console.error('Error resuming translation for record:', record.id, error);
+                    });
                   }
                 }
               }

@@ -3,6 +3,7 @@ import { getCurrentTS } from "@/lib/utils";
 
 export type DTOEncryptionSettings = {
   ecnryptedFields: string[]
+  passTemporaryServerEncryptionKey?: boolean
 }
 
 export const folderDTOSchema = z.object({

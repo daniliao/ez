@@ -3,7 +3,8 @@ import { DatabaseContextType } from '@/contexts/db-context';
 import { SaaSContextType } from '@/contexts/saas-context';
 
 export type PdfConversionRequest = {
-  pdfBase64: string;
+  pdfBase64?: string;
+  storageKey?: string;
   conversion_config?: {
     image_format?: string;
     height?: number;
@@ -25,7 +26,7 @@ export class PdfConversionApiClient extends ApiClient {
   }
 
   async convertPdf(request: PdfConversionRequest): Promise<PdfConversionResponse> {
-    const result = await this.request<PdfConversionResponse>('/api/convert-pdf', 'POST', { ecnryptedFields: [] }, request);
+    const result = await this.request<PdfConversionResponse>('/api/convert-pdf', 'POST', { ecnryptedFields: [], passTemporaryServerEncryptionKey: true }, request);
     return Array.isArray(result) ? result[0] : result;
   }
 } 

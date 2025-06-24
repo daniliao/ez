@@ -227,10 +227,6 @@ useEffect(() => {
     return text;
   };
 
-  // Add effect to log state changes
-  useEffect(() => {
-    console.log('Translation state changed:', isTranslating);
-  }, [isTranslating]);
 
   const handleTranslation = async () => {
     if (record.operationInProgress) {

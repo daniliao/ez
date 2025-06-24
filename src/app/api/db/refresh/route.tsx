@@ -1,5 +1,6 @@
 import { DatabaseAuthorizeRequestDTO, databaseRefreshRequestSchema, KeyDTO } from "@/data/dto";
 import { authorizeKey } from "@/data/server/server-key-helpers";
+import { generateTimeBasedPassword } from "@/lib/totp";
 import { getErrorMessage, getZedErrorMessage } from "@/lib/utils";
 import {SignJWT, jwtVerify, type JWTPayload} from 'jose'
 
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
             } else {
 
                 const alg = 'HS256'
-                const tokenPayload = { databaseIdHash: authRequest.databaseIdHash, keyHash: authRequest.keyHash, keyLocatorHash: authRequest.keyLocatorHash }
+                const tokenPayload = { databaseIdHash: authRequest.databaseIdHash, keyHash: authRequest.keyHash, keyLocatorHash: authRequest.keyLocatorHash, serverCommunicationKey: generateTimeBasedPassword() }
                 const accessToken = await new SignJWT(tokenPayload)
                 .setProtectedHeader({ alg })
                 .setIssuedAt()

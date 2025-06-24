@@ -32,6 +32,7 @@ import { AuditContext } from './audit-context';
 import { SaaSContext } from './saas-context';
 import { nanoid } from 'nanoid';
 import { parse as chatgptPagedParseRecord } from '@/ocr/ocr-llm-provider-paged';
+import { PdfConversionApiClient } from '@/data/client/pdf-conversion-api-client';
 
 
 // Add the helper function before the parseQueueInProgress variable
@@ -599,10 +600,27 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     
           try {
             if (ea.mimeType === 'application/pdf') {
-              if (statusUpdates) toast.info('Downloading file ' + ea.displayName);
-              const pdfBase64Content = await getAttachmentData(ea.toDTO(), AttachmentFormat.dataUrl) as string; // convert to images otherwise it's not supported by vercel ai sdk
-              if (statusUpdates) toast.info('Converting file  ' + ea.displayName + ' to images ...');
-                const imagesArray = await convert(pdfBase64Content, { base64: true, image_format: 'image/jpeg', height:  (process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT ? parseFloat(process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT) : 3200)   /*, scale: process.env.NEXT_PUBLIC_PDF_SCALE ? parseFloat(process.env.NEXT_PUBLIC_PDF_SCALE) : 0.9 }*/}, { dbContext, saasContext })
+
+              let imagesArray: string[] = [];
+              if(process.env.NEXT_PUBLIC_CONVERT_PDF_SERVERSIDE) {
+                console.log('Converting PDF to images server-side');
+                const apiClient = new PdfConversionApiClient('', dbContext, saasContext);
+                const result = await apiClient.convertPdf({
+                  storageKey: ea.storageKey,
+                  conversion_config: { image_format: 'image/jpeg', height:  (process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT ? parseFloat(process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT) : 3200)   /*, scale: process.env.NEXT_PUBLIC_PDF_SCALE ? parseFloat(process.env.NEXT_PUBLIC_PDF_SCALE) : 0.9 }*/}
+                });
+                imagesArray = result.images;
+          
+              } else { 
+
+                if (statusUpdates) toast.info('Downloading file ' + ea.displayName);
+
+                const pdfBase64Content = await getAttachmentData(ea.toDTO(), AttachmentFormat.dataUrl) as string; // convert to images otherwise it's not supported by vercel ai sdk
+                if (statusUpdates) toast.info('Converting file  ' + ea.displayName + ' to images ...');
+                imagesArray = await convert(pdfBase64Content, { base64: true, image_format: 'image/jpeg', height:  (process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT ? parseFloat(process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT) : 3200)   /*, scale: process.env.NEXT_PUBLIC_PDF_SCALE ? parseFloat(process.env.NEXT_PUBLIC_PDF_SCALE) : 0.9 }*/}, { dbContext, saasContext })
+              
+              }
+              
               if (statusUpdates) toast.info('File converted to ' + imagesArray.length + ' images');  
               for (let i = 0; i < imagesArray.length; i++){
                 attachments.push({
@@ -616,7 +634,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               attachments.push({
                 name: ea.displayName,
                 contentType: ea.mimeType,
-                url: await getAttachmentData(ea.toDTO(), AttachmentFormat.dataUrl) as string // TODO: convert PDF attachments to images here
+                url: await getAttachmentData(ea.toDTO(), AttachmentFormat.dataUrl) as string 
               })
             }
           } catch (error) {
@@ -624,7 +642,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             if (statusUpdates) toast.error('Error downloading attachment: ' + error);
           }
         }
-        cacheStorage.put(cacheKey, new Response(JSON.stringify(attachments)));
+        // cacheStorage.put(cacheKey, new Response(JSON.stringify(attachments))); TOOD: ENABLE THIS AGAIN
         return attachments;
       }
     

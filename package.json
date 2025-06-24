@@ -72,6 +72,7 @@
     "next-themes": "^0.3.0",
     "node-cache": "^5.1.2",
     "ollama-ai-provider": "^0.12.0",
+    "otplib": "^12.0.1",
     "password-validator": "^5.3.0",
     "pdfjs-dist": "5.3.31",
     "react": "^18.3.1",

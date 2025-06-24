@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useRef } from "react";
 import RecordItem from "./record-item";
 import { NoRecordsAlert } from "./shared/no-records-alert";
 import { RecordContext } from "@/contexts/record-context";
@@ -21,6 +21,7 @@ export default function RecordList({ folder }: {folder: Folder}) {
   const [tagsTimeline, setTagsTimeline] = useState<{year: string, freq: number }[]>([]);
   const [displayAttachmentPreviews, setDisplayAttachmentPreviews] = useState(false);
   const config = useContext(ConfigContext);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const getSortBy = (sortBy: string) => {
     // Split the string into field and direction
@@ -50,6 +51,23 @@ export default function RecordList({ folder }: {folder: Folder}) {
       }
     });
   });
+
+  // Auto-refresh logic: refresh data 1 minute after filters are applied
+  useEffect(() => {
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+    }
+    refreshIntervalRef.current = setInterval(() => {
+      if (folderContext?.currentFolder) {
+        recordContext?.listRecords(folderContext.currentFolder);
+      }
+    }, 60 * 1000); // 1 minute
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [recordContext?.filteredRecords, recordContext?.filterSelectedTags, folderContext?.currentFolder]);
 
   return (
     <div className="bg-white dark:bg-zinc-900 md:p-4 md:rounded-lg shadow-sm">

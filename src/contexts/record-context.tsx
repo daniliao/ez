@@ -715,13 +715,41 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     operationsApi.update(operationDTO); // fire-and-forget
   };
 
+  // Helper to update operation progress state
+  const updateOperationProgressState = (record: Record, operation: string, progress: number, progressOf: number, page: number, pages: number, metadata: any) => {
+    setOperationProgressByRecordId(prev => {
+      const id = record.id?.toString() || 'unknown';
+      const prevHistory = prev[id]?.history || [];
+      return {
+        ...prev,
+        [id]: {
+          operationName: operation,
+          progress,
+          progressOf,
+          page,
+          pages,
+          message: metadata?.message,
+          processedOnDifferentDevice: metadata?.processedOnDifferentDevice || false,
+          metadata,
+          textDelta: (prev[id]?.textDelta || '') + (metadata?.textDelta || ''),
+          pageDelta: metadata?.pageDelta || '',
+          recordText: metadata?.recordText || '',
+          history: [
+            ...prevHistory,
+            { operationName: operation, progress, progressOf, metadata, page, pages, processedOnDifferentDevice: metadata?.processedOnDifferentDevice || false, message: metadata?.message, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
+          ]
+        }
+      };
+    });
+  };
+
   const updateOperationProgress = async (record: Record, operation: string, inProgress: boolean, progress: number = 0, progressOf: number = 0, page: number = 0, pages: number = 0, metadata: any = null, error: any = null): Promise<Record> => {
-
-
     record.operationName = operation;
 
     if (inProgress !== record.operationInProgress || error !== record.operationError) {
       record.operationInProgress = inProgress;
+      // Update operation progress state when inProgress changes
+      updateOperationProgressState(record, operation, progress, progressOf, page, pages, metadata);
 
       setRecords(prevRecords => {
         const updated = prevRecords.map(pr => pr.id === record.id ? record : pr);
@@ -732,10 +760,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
     record.operationError = error;
 
+    if (progress === 0) {
+      console.log('Progress is 0, skipping', progress, progressOf, page, pages, metadata, error);
+    }
 
     if (progress > 0 && progressOf > 0) {
-
-
       const lastStep = await getRecordExtra(record, 'Parse process last step');
       record = await setRecordExtra(record, 'Parse process last step', new Date().toISOString(), (new Date().getTime() - new Date(lastStep as string).getTime()) > 30 * 60 * 1000); // save progress every 30s
 
@@ -773,31 +802,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     }
 
     if (progress > 0 && progressOf > 0 || error !== null || metadata?.message) {
-      // Save parsing progress in context state
-      setOperationProgressByRecordId(prev => {
-        const id = record.id?.toString() || 'unknown';
-        const prevHistory = prev[id]?.history || [];
-        return {
-          ...prev,
-          [id]: {
-            operationName: operation,
-            progress,
-            progressOf,
-            page,
-            pages,
-            message: metadata?.message,
-            processedOnDifferentDevice: metadata?.processedOnDifferentDevice || false,
-            metadata,
-            textDelta: (prev[id]?.textDelta || '') + (metadata?.textDelta || ''),
-            pageDelta: metadata?.pageDelta || '',
-            recordText: metadata?.recordText || '',
-            history: [
-              ...prevHistory,
-              { operationName: operation, progress, progressOf, metadata, page, pages, processedOnDifferentDevice: metadata?.processedOnDifferentDevice || false, message: metadata?.message, textDelta: metadata?.textDelta || '', pageDelta: metadata?.pageDelta || '', recordText: metadata?.recordText || '', timestamp: Date.now() }
-            ]
-          }
-        };
-      });
+      // Update operation progress state
+      updateOperationProgressState(record, operation, progress, progressOf, page, pages, metadata);
     }
 
     return record;

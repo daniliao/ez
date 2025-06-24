@@ -1719,7 +1719,6 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         
         // Check for recently finalized operations for the last record
         const operationsApi = getOperationsApiClient();
-        const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000).toISOString();
         
         // Get the last record to check its operations
         const lastRecord = records.length > 0 ? records[records.length - 1] : null;
@@ -1728,13 +1727,16 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           if ('data' in operationsResponse && Array.isArray(operationsResponse.data) && operationsResponse.data.length > 0) {
             const lastOperation = operationsResponse.data[0];
             
-            // Check if the last operation was just finalized in the last minute
-            if (lastOperation.operationFinished && 
+            if ((lastOperation.operationFinished || lastOperation.operationErrored) && 
                 lastOperation.operationLastStep && 
-                new Date(lastOperation.operationLastStep) > new Date(oneMinuteAgo)) {
+                (!lastRefreshed || new Date(lastOperation.operationLastStep) > lastRefreshed)) {
               
               console.log('Last operation for last record just finalized, returning finalization date');
               // Return the finalization date as the new record date
+
+              console.log('New operation finish or error, refreshing records');
+              await listRecords(forFolder);
+    
               return lastOperation.operationLastStep;
             }
           }
@@ -1742,7 +1744,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         
         // If we haven't refreshed yet or server data is newer, refresh
         if (!lastRefreshed || (serverLastUpdate && new Date(serverLastUpdate) > lastRefreshed)) {
-          console.log('Data is newer, refreshing records');
+          console.log('New operation finish or error, refreshing records');
           await listRecords(forFolder);
         }
       }
@@ -1760,11 +1762,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     
     // Set new interval - check every 20 seconds
     refreshIntervalRef.current = setInterval(async () => {
-      const finalizationDate = await checkAndRefreshRecords(forFolder);
-      if (finalizationDate) {
-        console.log('Operation finalized, finalization date:', finalizationDate);
-        // You can handle the finalization date here if needed
-      }
+      await checkAndRefreshRecords(forFolder);
     }, 20000);
   };
 

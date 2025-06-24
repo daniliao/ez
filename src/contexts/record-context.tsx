@@ -319,6 +319,9 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         if (newRecord) {
           updatedRecord.operationInProgress = true;
           updateOperationProgressState(updatedRecord, 'parse', 0,0,0,0, null);
+          
+          // Call parseRecord immediately for new records
+          parseRecord(updatedRecord);
         }
 
         setRecords(prevRecords =>
@@ -520,16 +523,141 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       }, []);
 
       setFilterAvailableTags(fetchedTags);
-      setRecords(fetchedRecords);
+      
+      // Check for recent operations and update operationInProgress status
+      const recordsWithOperationStatus = await checkRecentOperations(fetchedRecords);
+      
+      setRecords(recordsWithOperationStatus);
       setLastRefreshed(new Date());
       setLoaderStatus(DataLoadingStatus.Success);
       if (dbContext) auditContext.record({ eventName: 'listRecords', recordLocator: JSON.stringify([{ folderId: forFolder.id, recordIds: [fetchedRecords.map(r => r.id)] }]) });
-      return fetchedRecords;
+      
+      // Auto-parse records that need parsing
+      await autoParseRecords(recordsWithOperationStatus);
+      
+      return recordsWithOperationStatus;
     } catch (error) {
       setLoaderStatus(DataLoadingStatus.Error);
       toast.error('Error listing folder records');
       return Promise.reject(error);
     }
+  };
+
+  // Helper function to auto-parse records that need parsing
+  const autoParseRecords = async (records: Record[]) => {
+    if (!config) return;
+    
+    const autoParseEnabled = await config.getServerConfig('autoParseRecord');
+    if (!autoParseEnabled) return;
+
+    const autoTranslate = await config.getServerConfig('autoTranslateRecord');
+    
+    for (const record of records) {
+      // Check if record needs parsing: checksum mismatch, not in progress, no errors, and updated within last hour
+      if (record.checksum !== record.checksumLastParsed && 
+          !record.operationInProgress && 
+          !record.operationError && 
+          (new Date().getTime() - new Date(record.updatedAt).getTime()) < 1000 * 60 * 60) {
+        
+        console.log('Adding to parse queue due to checksum mismatch ', record.id, record.checksum, record.checksumLastParsed);
+        
+        if (autoTranslate) {
+          console.log('Auto-translate enabled, setting up callback');
+          parseRecord(record, async (parsedRecord) => {
+            await translateRecord(parsedRecord);
+          });
+        } else {
+          console.log('Auto-translate disabled');
+          parseRecord(record);
+        }
+      }
+    }
+    
+    // Process the parse queue
+    processParseQueue();
+  };
+
+  // Helper function to check for recent operations and update record status
+  const checkRecentOperations = async (records: Record[]) => {
+    try {
+      const operationsApi = getOperationsApiClient();
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      
+      // Get all recent operations
+      const response = await operationsApi.get({});
+      if ('data' in response && Array.isArray(response.data)) {
+        const recentOperations = response.data.filter(op => 
+          op.operationLastStep && 
+          new Date(op.operationLastStep) > new Date(twoMinutesAgo) &&
+          !op.operationFinished &&
+          !op.operationErrored
+        );
+        
+        const recordIdsWithRecentOperations = new Set(recentOperations.map(op => op.recordId));
+        
+        // Update records with recent operations
+        const updatedRecords = records.map(record => {
+          const updatedRecord = new Record(record);
+          const hasRecentOperation = recordIdsWithRecentOperations.has(record.id || 0);
+          
+          if (hasRecentOperation) {
+            updatedRecord.operationInProgress = true;
+            
+            // Find the operation for this record
+            const operation = recentOperations.find(op => op.recordId === record.id);
+            if (operation) {
+              // Check if operation is from a different session/device
+              if (operation.operationLastStepSessionId && operation.operationLastStepSessionId !== dbContext?.authorizedSessionId) {
+                const message = `Operation started on ${operation.operationStartedOnUserAgent} last data chunk received on ${operation.operationLastStep}`;
+                
+                // Update operation progress state with processedOnDifferentDevice flag
+                updateOperationProgressState(
+                  updatedRecord, 
+                  operation.operationName || 'unknown', 
+                  operation.operationProgress || 0, 
+                  operation.operationProgressOf || 0, 
+                  operation.operationPage || 0, 
+                  operation.operationPages || 0, 
+                  { 
+                    message, 
+                    processedOnDifferentDevice: true,
+                    textDelta: operation.operationTextDelta || '',
+                    pageDelta: operation.operationPageDelta || '',
+                    recordText: operation.operationRecordText || ''
+                  }
+                );
+              } else {
+                // Same session, just update the operation progress state
+                updateOperationProgressState(
+                  updatedRecord, 
+                  operation.operationName || 'unknown', 
+                  operation.operationProgress || 0, 
+                  operation.operationProgressOf || 0, 
+                  operation.operationPage || 0, 
+                  operation.operationPages || 0, 
+                  { 
+                    message: operation.operationMessage || '',
+                    processedOnDifferentDevice: false,
+                    textDelta: operation.operationTextDelta || '',
+                    pageDelta: operation.operationPageDelta || '',
+                    recordText: operation.operationRecordText || ''
+                  }
+                );
+              }
+            }
+          }
+          
+          return updatedRecord;
+        });
+        
+        setRecords(updatedRecords);
+        return updatedRecords;
+      }
+    } catch (error) {
+      console.error('Error checking recent operations:', error);
+    }
+    
+    return records;
   };
 
   const setupApiClient = async (config: ConfigContextType | null) => {

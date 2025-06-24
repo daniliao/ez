@@ -50,12 +50,19 @@ export class ApiClient {
 
   public async getArrayBuffer(
     endpoint: string,
-    repeatedRequestAccessToken = ''
+    repeatedRequestAccessToken = '',
+    passTemporaryServerEncryptionKey = false
   ): Promise<ArrayBuffer | null | undefined> {
     const headers: Record<string, string> = {};
 
     if (this.dbContext?.accessToken || repeatedRequestAccessToken) {
       headers['Authorization'] = `Bearer ${repeatedRequestAccessToken ? repeatedRequestAccessToken : this.dbContext?.accessToken}`;
+    }
+
+    const serverCommunicationKey = await this.dbContext?.getServerCommunicationKey();
+    if(serverCommunicationKey && passTemporaryServerEncryptionKey) {
+      const keyEncryptionTools = new EncryptionUtils(serverCommunicationKey);
+      headers['Encryption-Key'] = await keyEncryptionTools.encrypt(this.dbContext?.masterKey as string);
     }
 
     if(this.dbContext?.databaseHashId) {
@@ -125,6 +132,12 @@ export class ApiClient {
 
     if(this.dbContext?.databaseHashId) {
       headers['Database-Id-Hash'] = this.dbContext?.databaseHashId;
+    }
+
+    const serverCommunicationKey = await this.dbContext?.getServerCommunicationKey();
+    if(serverCommunicationKey && encryptionSettings?.passTemporaryServerEncryptionKey) {
+      const keyEncryptionTools = new EncryptionUtils(serverCommunicationKey);
+      headers['Encryption-Key'] = await keyEncryptionTools.encrypt(this.dbContext?.encryptionKey as string);
     }
 
     if(this.saasToken) {

@@ -7,6 +7,8 @@ import { EncryptionUtils, generateEncryptionKey, sha256 } from '@/lib/crypto';
 import { toast } from 'sonner';
 import { ZodIssue } from 'zod';
 import { SaaSContext } from './saas-context';
+import { generateTimeBasedPassword } from '@/lib/totp';
+import { jwtVerify } from 'jose';
 const argon2 = require("argon2-browser");
 
 // the salts are static as they're used as record locators in the DB - once changed the whole DB needs to be re-hashed
@@ -42,6 +44,8 @@ export type DatabaseContextType = {
     setMasterKey: (key: string) => void;
     encryptionKey: string;
     setEncryptionKey: (key: string) => void; 
+
+    getServerCommunicationKey: () => Promise<string>;
 
     acl: KeyACL | null;
     setACL: (acl: KeyACL | null) => void;
@@ -332,6 +336,12 @@ export const DatabaseContextProvider: React.FC<PropsWithChildren> = ({ children 
         }        
     };
 
+    // time based, temporary key for server communication
+    const getServerCommunicationKey = async () => {
+        const decoded = await jwtVerify(accessToken, new TextEncoder().encode(process.env.NEXT_PUBLIC_TOKEN_SECRET || 'Jeipho7ahchue4ahhohsoo3jahmui6Ap'));
+        return decoded.payload.serverCommunicationKey as string;
+    }
+
     const databaseContextValue: DatabaseContextType = {
         databaseId,
         setDatabaseId,
@@ -344,7 +354,7 @@ export const DatabaseContextProvider: React.FC<PropsWithChildren> = ({ children 
         databaseHashId,
         setDatabaseHashId,
         masterKey,
-    setMasterKey,
+        setMasterKey,
         encryptionKey,
         setEncryptionKey,
         authStatus,
@@ -360,7 +370,8 @@ export const DatabaseContextProvider: React.FC<PropsWithChildren> = ({ children 
         keepLoggedIn,
         acl,
         setACL,
-        featureFlags
+        featureFlags,
+        getServerCommunicationKey
     };
 
     return (

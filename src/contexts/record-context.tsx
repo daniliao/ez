@@ -600,10 +600,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           try {
             if (ea.mimeType === 'application/pdf') {
               if (statusUpdates) toast.info('Downloading file ' + ea.displayName);
+
               const pdfBase64Content = await getAttachmentData(ea.toDTO(), AttachmentFormat.dataUrl) as string; // convert to images otherwise it's not supported by vercel ai sdk
               if (statusUpdates) toast.info('Converting file  ' + ea.displayName + ' to images ...');
                 const imagesArray = await convert(pdfBase64Content, { base64: true, image_format: 'image/jpeg', height:  (process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT ? parseFloat(process.env.NEXT_PUBLIC_PDF_MAX_HEIGHT) : 3200)   /*, scale: process.env.NEXT_PUBLIC_PDF_SCALE ? parseFloat(process.env.NEXT_PUBLIC_PDF_SCALE) : 0.9 }*/}, { dbContext, saasContext })
-              if (statusUpdates) toast.info('File converted to ' + imagesArray.length + ' images');  
+              
+              
+                if (statusUpdates) toast.info('File converted to ' + imagesArray.length + ' images');  
               for (let i = 0; i < imagesArray.length; i++){
                 attachments.push({
                   name: ea.displayName + ' page ' + (i+1),

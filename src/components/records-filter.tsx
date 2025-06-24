@@ -22,11 +22,7 @@ export default function RecordsFilter({}) {
 
     const handleRefresh = async () => {
         if (folderContext?.currentFolder && recordContext?.checkAndRefreshRecords) {
-            const finalizationDate = await recordContext.checkAndRefreshRecords(folderContext.currentFolder);
-            if (finalizationDate) {
-                console.log('Operation finalized, finalization date:', finalizationDate);
-                // You can handle the finalization date here if needed
-            }
+            await recordContext.checkAndRefreshRecords(folderContext.currentFolder);
         }
     };
 

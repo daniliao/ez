@@ -123,7 +123,6 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('text');
   const [textAccordionValue, setTextAccordionValue] = useState('');
-  const [isTranslating, setIsTranslating] = useState(false);
   const [progressDialogOpen, setProgressDialogOpen] = useState(false);
 
   const [displayableAttachments, setDisplayableAttachments] = useState<DisplayableDataObject[]>([]);
@@ -131,6 +130,9 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
 
   // Helper to determine if the record is in progress based on operationProgress state
   const isInProgress = !!(operationProgress && typeof operationProgress.progress === 'number' && typeof operationProgress.progressOf === 'number' && operationProgress.progress < operationProgress.progressOf) || record.operationInProgress;
+
+  // Helper to determine if translation is in progress for this record
+  const isTranslationInProgress = !!(operationProgress && operationProgress.operationName === RegisteredOperations.Translate && typeof operationProgress.progress === 'number' && typeof operationProgress.progressOf === 'number' && operationProgress.progress < operationProgress.progressOf);
 
   const loadAttachmentPreviews = async () => {
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
@@ -227,9 +229,6 @@ useEffect(() => {
       return;
     }
     
-    console.log('Starting translation...');
-    setIsTranslating(true);
-    
     try {
       if (record.json) {
         console.log('Record already parsed, translating directly');
@@ -257,9 +256,6 @@ useEffect(() => {
     } catch (error) {
       console.error('Translation failed:', error);
       toast.error('Translation failed: ' + error);
-    } finally {
-      console.log('Translation process complete, resetting state');
-      setIsTranslating(false);
     }
   };
 
@@ -579,10 +575,10 @@ useEffect(() => {
             size="icon" 
             variant="ghost" 
             title="Translate to English" 
-            disabled={isTranslating} 
+            disabled={isTranslationInProgress} 
             onClick={handleTranslation}
           >
-            {isTranslating ? (
+            {isTranslationInProgress ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Languages className="w-4 h-4" />

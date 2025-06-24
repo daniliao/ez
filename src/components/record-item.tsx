@@ -167,7 +167,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
     const checksumChanged = lastlyLoadedCacheKey !== currentCacheKey;
     
-    if (displayAttachmentPreviews && !displayableAttachmentsInProgress && (checksumChanged || displayableAttachments.length === 0)) {
+    //if (displayAttachmentPreviews && !displayableAttachmentsInProgress ) { //&& (checksumChanged || displayableAttachments.length === 0)) {
       setDisplayableAttachmentsInProgress(true);
       setDisplayableAttachments([]);
       try {
@@ -178,7 +178,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
       } catch(error) {
         setDisplayableAttachmentsInProgress(false);
       };
-    }    
+    //}    
   }
 
   const shorten = (str: string, len = 16) => {

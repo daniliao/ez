@@ -171,7 +171,7 @@ export type RecordContextType = {
   setParsingDialogOpen: (open: boolean) => void;
   parsingDialogRecordId: string | null;
   setParsingDialogRecordId: (id: string | null) => void;
-  checkAndRefreshRecords: (forFolder: Folder) => Promise<string | void>;
+  checkAndRefreshRecords: (forFolder: Folder, forceRefresh?: boolean) => Promise<string | void>;
   startAutoRefresh: (forFolder: Folder) => void;
   stopAutoRefresh: () => void;
   lastRefreshed: Date | null;
@@ -1727,10 +1727,18 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
   }
 
   // Helper to check if records need refreshing
-  const checkAndRefreshRecords = async (forFolder: Folder) => {
+  const checkAndRefreshRecords = async (forFolder: Folder, forceRefresh: boolean = false) => {
     try {
       const client = await setupApiClient(config);
       if (!forFolder.id) return;
+      
+      // If forceRefresh is true, skip all checks and just refresh
+      if (forceRefresh) {
+        console.log('Manual refresh requested, refreshing records');
+        await listRecords(forFolder);
+        return new Date().toISOString();
+      }
+      
       const lastUpdateResponse = await client.getLastUpdateDate(forFolder.id);
       
       if (lastUpdateResponse.status === 200 && 'data' in lastUpdateResponse) {

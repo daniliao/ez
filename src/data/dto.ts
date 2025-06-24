@@ -70,6 +70,28 @@ export const EncryptedAttachmentDTOSchema = z.object({
 export const EncryptedAttachmentDTOEncSettings = { ecnryptedFields: ['displayName', 'description', 'mimeType', 'type', 'json', 'extra'] };
 export type EncryptedAttachmentDTO = z.infer<typeof EncryptedAttachmentDTOSchema>;
 
+export const operationDTOSchema = z.object({
+  id: z.number().positive().optional(),
+  recordId: z.number().positive().int(),
+  operationId: z.string().min(1),
+  operationName: z.string().min(1),
+  operationProgress: z.number().positive().int(),
+  operationProgressOf: z.number().positive().int(),
+  operationPage: z.number().positive().int(),
+  operationPages: z.number().positive().int(),
+  operationMessage: z.string().optional().nullable(),
+  operationTextDelta: z.string().optional().nullable(),
+  operationPageDelta: z.string().optional().nullable(),
+  operationRecordText: z.string().optional().nullable(),
+  operationStartedOn: z.string().optional().nullable(),
+  operationStartedOnUserAgent: z.string().optional().nullable(),
+  operationStartedOnSessionId: z.string().optional().nullable(),
+  operationLastStep: z.string().optional().nullable(),
+  operationLastStepUserAgent: z.string().optional().nullable(),
+  operationLastStepSessionId: z.string().optional().nullable()
+})
+export type OperationDTO = z.infer<typeof operationDTOSchema>;
+
 export const recordDTOSchema = z.object({
   id: z.number().positive().optional(),
   folderId: z.number().positive().int(),

@@ -168,7 +168,7 @@ export type RecordContextType = {
   setParsingDialogOpen: (open: boolean) => void;
   parsingDialogRecordId: string | null;
   setParsingDialogRecordId: (id: string | null) => void;
-  checkAndRefreshRecords: (forFolder: Folder) => Promise<void>;
+  checkAndRefreshRecords: (forFolder: Folder) => Promise<string | void>;
   startAutoRefresh: (forFolder: Folder) => void;
   stopAutoRefresh: () => void;
   lastRefreshed: Date | null;
@@ -550,10 +550,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       setRecords(recordsWithOperationStatus);
       setLastRefreshed(new Date());
       setLoaderStatus(DataLoadingStatus.Success);
-      if (dbContext) auditContext.record({ eventName: 'listRecords', recordLocator: JSON.stringify([{ folderId: forFolder.id, recordIds: [fetchedRecords.map(r => r.id)] }]) });
+      if (dbContext) auditContext?.record({ eventName: 'listRecords', recordLocator: JSON.stringify([{ folderId: forFolder.id, recordIds: [fetchedRecords.map(r => r.id)] }]) });
       
       // Auto-parse records that need parsing
       await autoParseRecords(recordsWithOperationStatus);
+      
+      // Also check for operation progress updates to show progress across sessions
+      await checkOperationProgressUpdates();
       
       return recordsWithOperationStatus;
     } catch (error) {
@@ -1711,6 +1714,29 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       if (lastUpdateResponse.status === 200 && 'data' in lastUpdateResponse) {
         const serverLastUpdate = lastUpdateResponse.data.lastUpdateDate;
         
+        // Check for recently finalized operations for the last record
+        const operationsApi = getOperationsApiClient();
+        const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000).toISOString();
+        
+        // Get the last record to check its operations
+        const lastRecord = records.length > 0 ? records[records.length - 1] : null;
+        if (lastRecord && lastRecord.id) {
+          const operationsResponse = await operationsApi.get({ recordId: lastRecord.id });
+          if ('data' in operationsResponse && Array.isArray(operationsResponse.data) && operationsResponse.data.length > 0) {
+            const lastOperation = operationsResponse.data[0];
+            
+            // Check if the last operation was just finalized in the last minute
+            if (lastOperation.operationFinished && 
+                lastOperation.operationLastStep && 
+                new Date(lastOperation.operationLastStep) > new Date(oneMinuteAgo)) {
+              
+              console.log('Last operation for last record just finalized, returning finalization date');
+              // Return the finalization date as the new record date
+              return lastOperation.operationLastStep;
+            }
+          }
+        }
+        
         // If we haven't refreshed yet or server data is newer, refresh
         if (!lastRefreshed || (serverLastUpdate && new Date(serverLastUpdate) > lastRefreshed)) {
           console.log('Data is newer, refreshing records');
@@ -1722,6 +1748,63 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     }
   };
 
+  // Helper to check operation progress updates without refreshing records
+  const checkOperationProgressUpdates = async () => {
+    try {
+      const operationsApi = getOperationsApiClient();
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      
+      // Get record IDs that are currently in the list
+      const recordIds = records.map(record => record.id).filter(id => id !== undefined) as number[];
+      
+      if (recordIds.length === 0) return;
+      
+      // Fetch operations for all records in a single request
+      const response = await operationsApi.get({ recordIds });
+      if ('data' in response && Array.isArray(response.data)) {
+        const recentOperations = response.data.filter(op => 
+          op.operationLastStep && 
+          new Date(op.operationLastStep) > new Date(twoMinutesAgo) &&
+          !op.operationFinished &&
+          !op.operationErrored &&
+          // Only process operations running on different devices (different session)
+          op.operationLastStepSessionId && 
+          op.operationLastStepSessionId !== dbContext?.authorizedSessionId
+        );
+        
+        // Update operation progress state only for operations on different devices
+        recentOperations.forEach(operation => {
+          const record = records.find(r => r.id === operation.recordId);
+          if (record) {
+            const updatedRecord = new Record(record);
+            updatedRecord.operationInProgress = true;
+            
+            const message = `Operation started on ${operation.operationStartedOnUserAgent} last data chunk received on ${operation.operationLastStep}`;
+            
+            // Update operation progress state with processedOnDifferentDevice flag
+            updateOperationProgressState(
+              updatedRecord, 
+              operation.operationName || 'unknown', 
+              operation.operationProgress || 0, 
+              operation.operationProgressOf || 0, 
+              operation.operationPage || 0, 
+              operation.operationPages || 0, 
+              { 
+                message, 
+                processedOnDifferentDevice: true,
+                textDelta: operation.operationTextDelta || '',
+                pageDelta: operation.operationPageDelta || '',
+                recordText: operation.operationRecordText || ''
+              }
+            );
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error checking operation progress updates:', error);
+    }
+  };
+
   // Start auto-refresh interval
   const startAutoRefresh = (forFolder: Folder) => {
     // Clear existing interval
@@ -1730,8 +1813,12 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     }
     
     // Set new interval - check every 20 seconds
-    refreshIntervalRef.current = setInterval(() => {
-      checkAndRefreshRecords(forFolder);
+    refreshIntervalRef.current = setInterval(async () => {
+      const finalizationDate = await checkAndRefreshRecords(forFolder);
+      if (finalizationDate) {
+        console.log('Operation finalized, finalization date:', finalizationDate);
+        // You can handle the finalization date here if needed
+      }
     }, 20000);
   };
 

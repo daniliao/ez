@@ -578,6 +578,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     if (!autoParseEnabled) return;
 
     const autoTranslate = await config.getServerConfig('autoTranslateRecord');
+    console.log('Auto-parse enabled:', autoParseEnabled, 'Auto-translate enabled:', autoTranslate);
     
     for (const record of records) {
       // Only parse user-uploaded records, not programmatically created ones
@@ -602,9 +603,29 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         console.log('Adding to parse queue - needs parsing:', record.id, 'json exists:', hasJson, 'checksum mismatch:', checksumMismatch, 'checksum:', record.checksum, 'checksumLastParsed:', record.checksumLastParsed);
         
         if (autoTranslate) {
-          console.log('Auto-translate enabled, setting up callback');
+          console.log('Auto-translate enabled, setting up callback for record:', record.id);
           parseRecord(record, async (parsedRecord) => {
-            await translateRecord(parsedRecord);
+            console.log('Parse completed, starting auto-translate for record:', parsedRecord.id);
+            
+            // Check for ongoing translation operations to prevent duplicate translations
+            const translationOperationCheck = await checkOngoingOperation(parsedRecord.id || 0, RegisteredOperations.Translate);
+            
+            if (translationOperationCheck.hasOngoingOperation) {
+              if (translationOperationCheck.isDifferentSession) {
+                console.log('Translation already in progress on different session for record:', parsedRecord.id);
+                return; // Don't start translation if it's already running on a different session
+              } else {
+                console.log('Translation already in progress on same session for record:', parsedRecord.id);
+                return; // Don't start translation if it's already running on the same session
+              }
+            }
+            
+            try {
+              await translateRecord(parsedRecord);
+              console.log('Auto-translate completed for record:', parsedRecord.id);
+            } catch (error) {
+              console.error('Error in auto-translate callback for record:', parsedRecord.id, error);
+            }
           });
         } else {
           console.log('Auto-translate disabled');
@@ -612,6 +633,40 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         }
       } else {
         console.log('Skipping record - already parsed:', record.id, 'json exists:', hasJson, 'checksum match:', !checksumMismatch, 'checksum:', record.checksum, 'checksumLastParsed:', record.checksumLastParsed);
+        
+        // Even if record is already parsed, check if auto-translation is needed
+        if (autoTranslate) {
+          // Check if this record already has translations
+          const hasTranslations = record.extra?.find(e => e.type === 'Reference record Ids');
+          if (!hasTranslations) {
+            console.log('Auto-translate enabled for already parsed record:', record.id);
+            
+            // Check for ongoing translation operations to prevent duplicate translations
+            const translationOperationCheck = await checkOngoingOperation(record.id || 0, RegisteredOperations.Translate);
+            
+            if (translationOperationCheck.hasOngoingOperation) {
+              if (translationOperationCheck.isDifferentSession) {
+                console.log('Translation already in progress on different session for record:', record.id);
+                // Don't start translation if it's already running on a different session
+                continue;
+              } else {
+                console.log('Translation already in progress on same session for record:', record.id);
+                // Don't start translation if it's already running on the same session
+                continue;
+              }
+            }
+            
+            // Call translateRecord directly since the record is already parsed
+            try {
+              await translateRecord(record);
+              console.log('Auto-translate completed for already parsed record:', record.id);
+            } catch (error) {
+              console.error('Error auto-translating already parsed record:', record.id, error);
+            }
+          } else {
+            console.log('Record already has translations, skipping auto-translate:', record.id);
+          }
+        }
       }
     }
     
@@ -1251,7 +1306,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       await createOperationLock(newRecord.id, RegisteredOperations.Parse);
     }
     
-    if (!parseQueue.find(pr => pr.id === newRecord.id) && (newRecord.attachments.length > 0 || newRecord.transcription)) {
+    if (!parseQueue.find(pr => pr.id === newRecord.id) && newRecord.attachments.length > 0) {
       if (postParseCallback) {
         newRecord.postParseCallback = postParseCallback;
       }

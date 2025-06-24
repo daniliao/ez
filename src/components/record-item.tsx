@@ -165,7 +165,9 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
 
   const loadAttachmentPreviews = async () => {
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
-    if (displayAttachmentPreviews && !displayableAttachmentsInProgress && lastlyLoadedCacheKey !== currentCacheKey) {
+    const checksumChanged = lastlyLoadedCacheKey !== currentCacheKey;
+    
+    if (displayAttachmentPreviews && !displayableAttachmentsInProgress && (checksumChanged || displayableAttachments.length === 0)) {
       setDisplayableAttachmentsInProgress(true);
       setDisplayableAttachments([]);
       try {
@@ -217,7 +219,7 @@ useEffect(() => {
       loadAttachmentPreviews();
     }
 
-  }, [displayAttachmentPreviews, record, isVisible]);
+  }, [displayAttachmentPreviews, record, isVisible, isInProgress, record.operationInProgress, record.checksum]);
 
   const downloadAsHtml = (text: string | undefined, filename: string) => {
     if (!text) return;

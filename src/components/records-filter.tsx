@@ -20,10 +20,15 @@ export default function RecordsFilter({}) {
     const recordContext = useContext(RecordContext);
     const folderContext = useContext(FolderContext);
 
-    const handleRefresh = async () => {
-      if (folderContext?.currentFolder) {
-        await recordContext?.listRecords(folderContext.currentFolder);
-      }
+    const handleRefresh = () => {
+        if (folderContext?.currentFolder && recordContext?.checkAndRefreshRecords) {
+            recordContext.checkAndRefreshRecords(folderContext.currentFolder);
+        }
+    };
+
+    const formatLastRefreshed = (date: Date | null) => {
+        if (!date) return '';
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
     return (
@@ -83,6 +88,11 @@ export default function RecordsFilter({}) {
             </DrawerContent>
           </Drawer>
           <Button variant="outline" className="h-10 ml-2" onClick={handleRefresh}><RefreshIcon className="w-4 h-4 mr-2" />Refresh</Button>
+          {recordContext?.lastRefreshed && (
+            <span className="text-xs text-muted-foreground ml-1">
+                {formatLastRefreshed(recordContext.lastRefreshed)}
+            </span>
+          )}
       </div>
     )
 }

@@ -165,6 +165,10 @@ export type RecordContextType = {
   setParsingDialogOpen: (open: boolean) => void;
   parsingDialogRecordId: string | null;
   setParsingDialogRecordId: (id: string | null) => void;
+  checkAndRefreshRecords: (forFolder: Folder) => Promise<void>;
+  startAutoRefresh: (forFolder: Folder) => void;
+  stopAutoRefresh: () => void;
+  lastRefreshed: Date | null;
 }
 
 export const RecordContext = createContext<RecordContextType | null>(null);
@@ -198,6 +202,8 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
   }>({});
   const [parsingDialogOpen, setParsingDialogOpen] = useState(false);
   const [parsingDialogRecordId, setParsingDialogRecordId] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
 
   useEffect(() => { // filter records when tags change
@@ -509,6 +515,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
 
       setFilterAvailableTags(fetchedTags);
       setRecords(fetchedRecords);
+      setLastRefreshed(new Date());
       setLoaderStatus(DataLoadingStatus.Success);
       if (dbContext) auditContext.record({ eventName: 'listRecords', recordLocator: JSON.stringify([{ folderId: forFolder.id, recordIds: [fetchedRecords.map(r => r.id)] }]) });
       return fetchedRecords;
@@ -1273,6 +1280,55 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     }
   }
 
+  // Helper to check if records need refreshing
+  const checkAndRefreshRecords = async (forFolder: Folder) => {
+    try {
+      const client = await setupApiClient(config);
+      if (!forFolder.id) return;
+      const lastUpdateResponse = await client.getLastUpdateDate(forFolder.id);
+      
+      if (lastUpdateResponse.status === 200 && 'data' in lastUpdateResponse) {
+        const serverLastUpdate = lastUpdateResponse.data.lastUpdateDate;
+        
+        // If we haven't refreshed yet or server data is newer, refresh
+        if (!lastRefreshed || (serverLastUpdate && new Date(serverLastUpdate) > lastRefreshed)) {
+          console.log('Data is newer, refreshing records');
+          await listRecords(forFolder);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for updates:', error);
+    }
+  };
+
+  // Start auto-refresh interval
+  const startAutoRefresh = (forFolder: Folder) => {
+    // Clear existing interval
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+    }
+    
+    // Set new interval - check every 20 seconds
+    refreshIntervalRef.current = setInterval(() => {
+      checkAndRefreshRecords(forFolder);
+    }, 20000);
+  };
+
+  // Stop auto-refresh interval
+  const stopAutoRefresh = () => {
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
+    }
+  };
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      stopAutoRefresh();
+    };
+  }, []);
+
   return (
     <RecordContext.Provider
       value={{
@@ -1287,6 +1343,10 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         setCurrentRecord,
         currentRecord,
         listRecords,
+        checkAndRefreshRecords,
+        startAutoRefresh,
+        stopAutoRefresh,
+        lastRefreshed,
         deleteRecord,
         recordEditMode,
         setRecordEditMode,

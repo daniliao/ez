@@ -17,6 +17,19 @@ export type DeleteRecordResponse = {
   status: 200;
 };
 
+export type GetLastUpdateDateResponseSuccess = {
+  message: string;
+  data: { lastUpdateDate: string | null };
+  status: 200;
+};
+
+export type GetLastUpdateDateResponseError = {
+  message: string;
+  status: 400 | 500;
+};
+
+export type GetLastUpdateDateResponse = GetLastUpdateDateResponseSuccess | GetLastUpdateDateResponseError;
+
 export type PutRecordResponseError = {
   message: string;
   status: 400;
@@ -24,7 +37,6 @@ export type PutRecordResponseError = {
 };
 
 export type PutRecordResponse = PutRecordResponseSuccess | PutRecordResponseError;
-
 
 export class RecordApiClient extends ApiClient {
     constructor(baseUrl: string, dbContext?: DatabaseContextType | null, saasContext?: SaaSContextType | null, encryptionConfig?: ApiEncryptionConfig) {
@@ -41,5 +53,9 @@ export class RecordApiClient extends ApiClient {
 
     async delete(record: RecordDTO): Promise<DeleteRecordResponse> {
       return this.request<DeleteRecordResponse>('/api/record/' + record.id, 'DELETE', { ecnryptedFields: [] }) as Promise<DeleteRecordResponse>;
-    }    
+    }
+
+    async getLastUpdateDate(folderId: number): Promise<GetLastUpdateDateResponse> {
+      return this.request<GetLastUpdateDateResponse>('/api/record/last-update?folderId=' + folderId, 'GET', { ecnryptedFields: [] }) as Promise<GetLastUpdateDateResponse>;
+    }
 }

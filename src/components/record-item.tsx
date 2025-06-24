@@ -215,7 +215,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
 
 useEffect(() => {
 
-    if (isVisible && !isInProgress) {      
+    if (isVisible) {      
       loadAttachmentPreviews();
     }
 

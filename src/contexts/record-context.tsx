@@ -187,7 +187,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
   const [filterAvailableTags, setFilterAvailableTags] = useState<FilterTag[]>([]);
   const [filterSelectedTags, setFilterSelectedTags] = useState<string[]>([]);
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
-  const [sortBy, setSortBy] = useState<string>('eventDate desc');
+  const [sortBy, setSortBy] = useState<string>('createdAt desc');
   const [operationProgressByRecordId, setOperationProgressByRecordId] = useState<{
     [recordId: string]: {
       operationName: string;

@@ -350,9 +350,7 @@ export const DatabaseContextProvider: React.FC<PropsWithChildren> = ({ children 
         try {
             const decoded = await jwtVerify(accessToken, new TextEncoder().encode(process.env.NEXT_PUBLIC_TOKEN_SECRET || 'Jeipho7ahchue4ahhohsoo3jahmui6Ap'));
             return decoded.payload.serverCommunicationKey as string;
-        } catch (error) {
-            console.log('JWT verification failed, attempting to refresh token:', error);
-            
+        } catch (error) {            
             // Try to refresh the token
             if (refreshToken) {
                 try {

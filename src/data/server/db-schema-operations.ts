@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const operations = sqliteTable('operations', {
@@ -6,10 +6,10 @@ export const operations = sqliteTable('operations', {
     recordId: integer('recordId', { mode: 'number' }),
     operationId: text('operationId'),
     operationName: text('operationName'),
-    operationProgress: integer('operationProgress', { mode: 'number' }),
-    operationProgressOf: integer('operationProgressOf', { mode: 'number' }),
-    operationPage: integer('operationPage', { mode: 'number' }),
-    operationPages: integer('operationPages', { mode: 'number' }),
+    operationProgress: real('operationProgress'),
+    operationProgressOf: real('operationProgressOf'),
+    operationPage: real('operationPage'),
+    operationPages: real('operationPages'),
     operationMessage: text('operationMessage'),
     operationTextDelta: text('operationTextDelta'),
     operationPageDelta: text('operationPageDelta'),

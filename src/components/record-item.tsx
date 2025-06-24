@@ -182,7 +182,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
 
 useEffect(() => {
 
-    if (isVisible) {      
+    if (isVisible && !isInProgress) {      
       loadAttachmentPreviews();
     }
 
@@ -304,7 +304,7 @@ useEffect(() => {
               <div key={index} className="text-sm inline-flex w-auto"><Button variant="outline" onClick={() => recordContext?.downloadAttachment(attachment.toDTO(), false)}><PaperclipIcon className="w-4 h-4 mr-2" /> {shorten(attachment.displayName)}</Button></div>
             ))}
           </div>
-          {displayAttachmentPreviews && record.attachments.length > 0 ? (
+          {displayAttachmentPreviews && record.attachments.length > 0  && ! isInProgress ? (
             displayableAttachments.length > 0 ? (
               <div className="mt-2 flex-wrap flex items-center justify-left min-h-100 w-full">
                 {displayableAttachments.map((attachment, index) => (

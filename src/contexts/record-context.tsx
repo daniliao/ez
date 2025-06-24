@@ -307,6 +307,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       const response = await client.put(recordDTO);
       const newRecord = typeof record?.id === 'undefined'
 
+
       if (response.status !== 200) {
         console.error('Error adding folder record:', response.message);
         toast.error('Error adding folder record');
@@ -315,6 +316,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       } else {
         const updatedRecord = new Record({ ...record, id: response.data.id } as Record);
         const prevRecord = records.find(r => r.id === record.id);
+        if (newRecord) {
+          updatedRecord.operationInProgress = true;
+          updateOperationProgressState(updatedRecord, 'parse', 0,0,0,0, null);
+        }
+
         setRecords(prevRecords =>
           newRecord ? [...prevRecords, updatedRecord] :
             prevRecords.map(pr => pr.id === updatedRecord.id ? updatedRecord : pr)

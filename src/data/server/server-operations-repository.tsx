@@ -1,7 +1,7 @@
 import { BaseRepository, IQuery } from "./base-repository";
 import { OperationDTO } from "../dto";
 import { operations } from "./db-schema-operations";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { create } from "./generic-repository";
 
 export default class ServerOperationsRepository extends BaseRepository<OperationDTO> {
@@ -54,6 +54,7 @@ export default class ServerOperationsRepository extends BaseRepository<Operation
                 dbQuery.where(eq(operations.operationId, String(query.filter.operationId)));
             }
         }
+        dbQuery.orderBy(desc(operations.operationLastStep));
         return Promise.resolve(dbQuery.all() as OperationDTO[]);
     }
 

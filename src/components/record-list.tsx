@@ -123,7 +123,7 @@ export default function RecordList({ folder }: {folder: Folder}) {
             ) : (null) }            
 
             {sort(recordContext?.filteredRecords ?? []).by(getSortBy(recordContext?.sortBy ?? 'eventDate desc')).map((record, index) => (
-              <RecordItem key={index} record={record} displayAttachmentPreviews={displayAttachmentPreviews} />
+              <RecordItem key={index} record={record} displayAttachmentPreviews={displayAttachmentPreviews} isFirstRecord={index === 0} />
             ))}
           </div>
 

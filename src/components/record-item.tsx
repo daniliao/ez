@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { DisplayableDataObject, Record, DataLoadingStatus, RegisteredOperations } from "@/data/client/models";
-import { useContext, useEffect, useRef, useState, ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
 import { CalendarIcon, PencilIcon, TagIcon, Wand2Icon, XCircleIcon, DownloadIcon, PaperclipIcon, Trash2Icon, RefreshCw, MessageCircle, Languages, TextIcon, BookTextIcon, FileText, Loader2, LanguagesIcon, ImageIcon } from "lucide-react";
 import { RecordContext } from "@/contexts/record-context";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
@@ -137,7 +137,7 @@ function OperationProgressBar({ operationName, operationProgress }: { operationN
   );
 }
 
-export default function RecordItem({ record, displayAttachmentPreviews }: { record: Record, displayAttachmentPreviews: boolean }) {
+export default function RecordItem({ record, displayAttachmentPreviews, isFirstRecord = false }: { record: Record, displayAttachmentPreviews: boolean, isFirstRecord?: boolean }) {
   // TODO: refactor and extract business logic to a separate files
   const recordContext = useContext(RecordContext)
   const chatContext = useContext(ChatContext);
@@ -163,23 +163,58 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
   // Helper to determine if translation is in progress for this record
   const isTranslationInProgress = !!(operationProgress && operationProgress.operationName === RegisteredOperations.Translate && typeof operationProgress.progress === 'number' && typeof operationProgress.progressOf === 'number' && operationProgress.progress < operationProgress.progressOf);
 
-  const loadAttachmentPreviews = async () => {
+  const loadAttachmentPreviews = useCallback(async () => {
+    // Skip if not enabled or already in progress
+    if (!displayAttachmentPreviews || displayableAttachmentsInProgress) {
+      return;
+    }
+
+    // Skip if no attachments
+    if (!record.attachments || record.attachments.length === 0) {
+      return;
+    }
+
     const currentCacheKey = await record.cacheKey(dbContext?.databaseHashId);
     const checksumChanged = lastlyLoadedCacheKey !== currentCacheKey;
+    const hasNoAttachments = displayableAttachments.length === 0;
     
-    //if (displayAttachmentPreviews && !displayableAttachmentsInProgress ) { //&& (checksumChanged || displayableAttachments.length === 0)) {
+    // For first record, always load if no attachments or checksum changed
+    // For other records, only load if checksum changed or no attachments
+    if (checksumChanged || hasNoAttachments) {
       setDisplayableAttachmentsInProgress(true);
       setDisplayableAttachments([]);
+      
       try {
         const attachments = await recordContext?.convertAttachmentsToImages(record, false);
         setDisplayableAttachments(attachments as DisplayableDataObject[]);
-        setDisplayableAttachmentsInProgress(false);
-        setLastlyLoadedCacheKey(currentCacheKey)
+        setLastlyLoadedCacheKey(currentCacheKey);
       } catch(error) {
+        console.error('Error loading attachment previews:', error);
+      } finally {
         setDisplayableAttachmentsInProgress(false);
-      };
-    //}    
-  }
+      }
+    }
+  }, [displayAttachmentPreviews, displayableAttachmentsInProgress, record, lastlyLoadedCacheKey, dbContext?.databaseHashId, recordContext]);
+
+  // Single effect for first record - load once when component mounts
+  useEffect(() => {
+    if (isFirstRecord && displayAttachmentPreviews && record.attachments?.length > 0) {
+      // Clear cache to force fresh load for first record
+      setLastlyLoadedCacheKey('');
+      setDisplayableAttachments([]);
+      // Small delay to ensure state is cleared before loading
+      setTimeout(() => {
+        loadAttachmentPreviews();
+      }, 100);
+    }
+  }, [isFirstRecord, displayAttachmentPreviews, record.id]); // Only depend on record.id, not the function
+
+  // Main effect for loading attachment previews when visible (for non-first records)
+  useEffect(() => {
+    if (!isFirstRecord && isVisible && !isInProgress) {      
+      loadAttachmentPreviews();
+    }
+  }, [isVisible, isInProgress, record.checksum, displayAttachmentPreviews, isFirstRecord]);
 
   const shorten = (str: string, len = 16) => {
     if(str) {
@@ -197,7 +232,7 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
       {
         root: null, // viewport
         rootMargin: '0px', // no margin
-        threshold: 0.25, // 50% of target visible
+        threshold: 0.25, // 25% of target visible
       }
     );
 
@@ -205,21 +240,12 @@ export default function RecordItem({ record, displayAttachmentPreviews }: { reco
       observer.observe(thisElementRef.current);
     }
 
-    // Clean up the observer
-/*    return () => {
+    return () => {
       if (thisElementRef.current) {
         observer.unobserve(thisElementRef.current);
       }
-    };*/
+    };
   }, [])
-
-useEffect(() => {
-
-    if (isVisible) {      
-      loadAttachmentPreviews();
-    }
-
-  }, [displayAttachmentPreviews, record, isVisible, isInProgress, record.operationInProgress, record.checksum]);
 
   const downloadAsHtml = (text: string | undefined, filename: string) => {
     if (!text) return;

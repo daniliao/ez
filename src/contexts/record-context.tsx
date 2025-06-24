@@ -323,16 +323,25 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         const updatedRecord = new Record({ ...record, id: response.data.id } as Record);
         const prevRecord = records.find(r => r.id === record.id);
         if (newRecord) {
-          updatedRecord.operationInProgress = true;
-          updateOperationProgressState(updatedRecord, 'parse', 0,0,0,0, null);
+          // Check if this is a programmatically created record (like a translation)
+          // These records already have JSON content and shouldn't be parsed
+          const isProgrammaticallyCreated = !isUserUploadedRecord(record);
           
-          // Call parseRecord immediately for new records
-          // Also trigger auto-translate if enabled
-          const autoTranslate = await config?.getServerConfig('autoTranslateRecord');
-          if (autoTranslate && response.data.id !== undefined) {
-            autoTranslateAfterParse.add(response.data.id);
+          if (!isProgrammaticallyCreated) {
+            // Only set in progress and parse for user-uploaded records
+            updatedRecord.operationInProgress = true;
+            updateOperationProgressState(updatedRecord, 'parse', 0,0,0,0, null);
+            
+            // Call parseRecord immediately for new records
+            // Also trigger auto-translate if enabled
+            const autoTranslate = await config?.getServerConfig('autoTranslateRecord');
+            if (autoTranslate && response.data.id !== undefined) {
+              autoTranslateAfterParse.add(response.data.id);
+            }
+            parseRecord(updatedRecord);
+          } else {
+            console.log('Skipping parse for programmatically created record:', record.id);
           }
-          parseRecord(updatedRecord);
         }
 
         setRecords(prevRecords =>
@@ -1214,6 +1223,18 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
           // Execute post-parse callback if exists
           if (updatedRecord && currentRecord.postParseCallback) {
             await currentRecord.postParseCallback(updatedRecord);
+          }
+          
+          // Check if auto-translation should be triggered for this record
+          if (currentRecord && autoTranslateAfterParse.has(currentRecord.id!)) {
+            console.log('Auto-translate triggered after parse for record:', currentRecord.id);
+            try {
+              await translateRecord(updatedRecord || currentRecord);
+              console.log('Auto-translate completed for record:', currentRecord.id);
+            } catch (error) {
+              console.error('Error auto-translating after parse for record:', currentRecord.id, error);
+            }
+            autoTranslateAfterParse.delete(currentRecord.id!);
           }
           
           // Explicitly finish the operation successfully

@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest, response: NextResponse) {
     const requestContext = await authorizeRequestContext(request, response);
-    const repo = new ServerOperationsRepository(requestContext.databaseIdHash, 'operations');
+    const repo = new ServerOperationsRepository(requestContext.databaseIdHash, 'operations', 'operations');
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const recordId = searchParams.get('recordId');
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, response: NextResponse) {
 
 export async function POST(request: NextRequest, response: NextResponse) {
     const requestContext = await authorizeRequestContext(request, response);
-    const repo = new ServerOperationsRepository(requestContext.databaseIdHash, 'operations');
+    const repo = new ServerOperationsRepository(requestContext.databaseIdHash, 'operations', 'operations');
     const body = await request.json();
     const validationResult = operationDTOSchema.safeParse(body);
     if (!validationResult.success) {
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest, response: NextResponse) {
 
 export async function PUT(request: NextRequest, response: NextResponse) {
     const requestContext = await authorizeRequestContext(request, response);
-    const repo = new ServerOperationsRepository(requestContext.databaseIdHash, 'operations');
+    const repo = new ServerOperationsRepository(requestContext.databaseIdHash, 'operations', 'operations');
     const body = await request.json();
     const validationResult = operationDTOSchema.safeParse(body);
     if (!validationResult.success) {
@@ -71,7 +71,7 @@ export async function PUT(request: NextRequest, response: NextResponse) {
 
 export async function DELETE(request: NextRequest, response: NextResponse) {
     const requestContext = await authorizeRequestContext(request, response);
-    const repo = new ServerOperationsRepository(requestContext.databaseIdHash, 'operations');
+    const repo = new ServerOperationsRepository(requestContext.databaseIdHash, 'operations', 'operations');
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const recordId = searchParams.get('recordId');

@@ -33,6 +33,7 @@ import { SaaSContext } from './saas-context';
 import { nanoid } from 'nanoid';
 import { parse as chatgptPagedParseRecord } from '@/ocr/ocr-llm-provider-paged';
 import { PdfConversionApiClient } from '@/data/client/pdf-conversion-api-client';
+import { isIOS } from '@/lib/utils';
 
 
 // Add the helper function before the parseQueueInProgress variable
@@ -534,7 +535,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         return client;
     }
 
-      const getAttachmentData = async(attachmentDTO: EncryptedAttachmentDTO, type: AttachmentFormat, useCache = true): Promise<string|Blob> => {
+      const getAttachmentData = async(attachmentDTO: EncryptedAttachmentDTO, type: AttachmentFormat, useCache = true, temporaryPassEncryptionKey: boolean = false): Promise<string|Blob> => {
         const cacheStorage = await cache();
         const cacheKey = `${attachmentDTO.storageKey}-${attachmentDTO.id}-${type}`;
         const attachmentDataUrl = await cacheStorage.match(cacheKey);
@@ -547,7 +548,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         console.log('Download attachment', attachmentDTO);
     
         const client = await setupAttachmentsApiClient(config);
-        const arrayBufferData = await client.get(attachmentDTO);    
+        const arrayBufferData = temporaryPassEncryptionKey ? await client.getDecryptedServerSide(attachmentDTO) : await client.get(attachmentDTO);    // decrypt on server side if needed
     
         if (type === AttachmentFormat.blobUrl) {
           const blob = new Blob([arrayBufferData], { type: attachmentDTO.mimeType + ";charset=utf-8" });
@@ -567,7 +568,13 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     
       const downloadAttachment = async (attachment: EncryptedAttachmentDTO, useCache = true) => {
         try {
-          const url = await getAttachmentData(attachment, AttachmentFormat.blobUrl, useCache) as string;
+          let url = '';
+          if (isIOS() && (process.env.NEXT_PUBLIC_OPTIONAL_CONVERT_PDF_SERVERSIDE || process.env.NEXT_PUBLIC_CONVERT_PDF_SERVERSIDE)) {
+            console.log('Downloading attachment with server-side decryption');
+            url = await getAttachmentData(attachment, AttachmentFormat.blobUrl, useCache, true) as string;
+          } else {
+            url = await getAttachmentData(attachment, AttachmentFormat.blobUrl, useCache) as string;
+          }
           window.open(url);    
         } catch (error) {
           toast.error('Error downloading attachment ' + error);
@@ -602,7 +609,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             if (ea.mimeType === 'application/pdf') {
 
               let imagesArray: string[] = [];
-              if(process.env.NEXT_PUBLIC_CONVERT_PDF_SERVERSIDE) {
+              if((isIOS() &&(process.env.NEXT_PUBLIC_OPTIONAL_CONVERT_PDF_SERVERSIDE) || process.env.NEXT_PUBLIC_CONVERT_PDF_SERVERSIDE)) {
                 console.log('Converting PDF to images server-side');
                 const apiClient = new PdfConversionApiClient('', dbContext, saasContext);
                 const result = await apiClient.convertPdf({
@@ -642,7 +649,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             if (statusUpdates) toast.error('Error downloading attachment: ' + error);
           }
         }
-        // cacheStorage.put(cacheKey, new Response(JSON.stringify(attachments))); TOOD: ENABLE THIS AGAIN
+        cacheStorage.put(cacheKey, new Response(JSON.stringify(attachments))); 
         return attachments;
       }
     
@@ -960,7 +967,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
               try {
                 const attFileName = filenamify(attachment.displayName.replace('.','-' + attachment.id + '.'), {replacement: '-'});
                 toast.info('Downloading attachment: ' + attachment.displayName);
-                const attBlob = await getAttachmentData(attachment.toDTO(), AttachmentFormat.blob, true);
+                const attBlob = await getAttachmentData(attachment.toDTO(), AttachmentFormat.blob, true, (isIOS() && process.env.NEXT_PUBLIC_OPTIONAL_CONVERT_PDF_SERVERSIDE !== '') || process.env.NEXT_PUBLIC_CONVERT_PDF_SERVERSIDE !=='');
                 if (folder) folder.file(attFileName, attBlob as Blob);
 
                 attachment.filePath = recordNiceName + '/' + attFileName // modify for the export

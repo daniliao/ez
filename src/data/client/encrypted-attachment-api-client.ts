@@ -39,8 +39,13 @@ export class EncryptedAttachmentApiClient extends ApiClient {
     }
 
     async get(attachment: EncryptedAttachmentDTO): Promise<ArrayBuffer | undefined | null> {
-      return this.getArrayBuffer('/api/encrypted-attachment/' + attachment.storageKey);
+      return this.getArrayBuffer('/api/encrypted-attachment/' + attachment.storageKey, undefined);
     }
+
+    async getDecryptedServerSide(attachment: EncryptedAttachmentDTO): Promise<ArrayBuffer | undefined | null> { // unsafe - as it passes the encryption key to the server
+      return this.getArrayBuffer('/api/encrypted-attachment/' + attachment.storageKey, undefined, true);
+    }
+
 
     async delete(attachment: EncryptedAttachmentDTO): Promise<DeleteEncryptedAttachmentResponse> {
       return this.request<DeleteEncryptedAttachmentResponse>('/api/encrypted-attachment/' + attachment.storageKey, 'DELETE', { ecnryptedFields: [] }) as Promise<DeleteEncryptedAttachmentResponse>;

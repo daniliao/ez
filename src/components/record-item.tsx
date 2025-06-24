@@ -65,22 +65,31 @@ const MarkdownLinkHandler = ({node, href, children, ...props}: {node?: any; href
 
 // --- OperationProgressBar component ---
 function OperationProgressBar({ operationName, operationProgress }: { operationName: string, operationProgress: any }) {
-  if (operationProgress?.message) {
+  // Show progress bar if there's a message or if processedOnDifferentDevice is true
+  const shouldShowProgress = operationProgress?.message || operationProgress?.processedOnDifferentDevice;
+  
+  if (shouldShowProgress) {
     return (
       <div className="w-full mt-2 mb-2">
         <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-2">
           <FileText className="w-4 h-4 mr-2" />
-          {operationProgress.message}
-        </div>  
+          {operationProgress.message || 'Operation in progress on different device...'}
+        </div>
+        {operationProgress?.processedOnDifferentDevice && (
+          <div className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">
+            ⚠️ This operation is running on another device
+          </div>
+        )}
       </div>
     );
   }
+  
   if (!operationProgress || typeof operationProgress.progress !== 'number' || typeof operationProgress.progressOf !== 'number' || operationProgress.progress <= 0 || operationProgress.progressOf <= 0) {
-  return null;
+    return null;
   }
+  
   const percent = Math.min(100, Math.round((operationProgress.progress / operationProgress.progressOf) * 100));
   let label = '';
-
 
   if (operationName === RegisteredOperations.Parse) {
     label = `Parsed pages: ${operationProgress.page} / ${operationProgress.pages}`;
@@ -89,6 +98,7 @@ function OperationProgressBar({ operationName, operationProgress }: { operationN
   } else {
     label = `Operation in progress: ${percent}%`;
   }
+  
   return (
     <div className="w-full mt-2 mb-2">
       <div className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center mb-2">

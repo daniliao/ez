@@ -19,6 +19,9 @@ export const operations = sqliteTable('operations', {
     operationStartedOnSessionId: text('operationStartedOnSessionId'),
     operationLastStep: text('operationLastStep'),
     operationLastStepUserAgent: text('operationLastStepUserAgent'),
-    operationLastStepSessionId: text('operationLastStepSessionId')
+    operationLastStepSessionId: text('operationLastStepSessionId'),
+    operationFinished: integer('operationFinished', { mode: 'boolean' }).default(false),
+    operationErrored: integer('operationErrored', { mode: 'boolean' }).default(false),
+    operationErrorMessage: text('operationErrorMessage')
 });
 

@@ -685,7 +685,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
   };
 
   // Helper to send operation progress update (fire-and-forget)
-  const sendOperationProgressUpdate = (record: Record, operation: string, progress: number, progressOf: number, page: number, pages: number, metadata: any) => {
+  const sendOperationProgressUpdate = (record: Record, operation: string, progress: number, progressOf: number, page: number, pages: number, metadata: any, finished = false, errored = false, errorMessage: string | null = null) => {
     if (typeof record.id !== 'number') return;
     const operationsApi = getOperationsApiClient();
     const operationId = `${operation}-${record.id}`;
@@ -707,7 +707,10 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
       operationStartedOnSessionId: dbContext?.authorizedSessionId || null,
       operationLastStep: new Date().toISOString(),
       operationLastStepUserAgent: navigator.userAgent,
-      operationLastStepSessionId: dbContext?.authorizedSessionId || null
+      operationLastStepSessionId: dbContext?.authorizedSessionId || null,
+      operationFinished: finished,
+      operationErrored: errored,
+      operationErrorMessage: errorMessage,
     };
     operationsApi.update(operationDTO); // fire-and-forget
   };
@@ -722,7 +725,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
     if (inProgress !== record.operationInProgress || error !== record.operationError) {
       setRecords(prevRecords => {
         const updated = prevRecords.map(pr => pr.id === record.id ? record : pr);
-        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata);
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, progress > 0 && progressOf > 0, error !== null, getErrorMessage(error));
         return updated;
       });
     }
@@ -760,11 +763,11 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
         }
 
         record = await updateRecord(record);
-        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata);
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, progress === (progressOf - 1), false, null);
       }
       // Fire every 30 tokens in between
       if (progress % 30 === 0) {
-        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata);
+        sendOperationProgressUpdate(record, operation, progress, progressOf, page, pages, metadata, progress === (progressOf - 1), false, null);
       }
     }
 

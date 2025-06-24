@@ -88,7 +88,10 @@ export const operationDTOSchema = z.object({
   operationStartedOnSessionId: z.string().optional().nullable(),
   operationLastStep: z.string().optional().nullable(),
   operationLastStepUserAgent: z.string().optional().nullable(),
-  operationLastStepSessionId: z.string().optional().nullable()
+  operationLastStepSessionId: z.string().optional().nullable(),
+  operationFinished: z.boolean().optional(),
+  operationErrored: z.boolean().optional(),
+  operationErrorMessage: z.string().optional().nullable(),
 })
 export type OperationDTO = z.infer<typeof operationDTOSchema>;
 

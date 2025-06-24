@@ -649,7 +649,7 @@ export const RecordContextProvider: React.FC<PropsWithChildren> = ({ children })
             if (statusUpdates) toast.error('Error downloading attachment: ' + error);
           }
         }
-        // cacheStorage.put(cacheKey, new Response(JSON.stringify(attachments))); TOOD: ENABLE THIS AGAIN
+        cacheStorage.put(cacheKey, new Response(JSON.stringify(attachments))); 
         return attachments;
       }
     

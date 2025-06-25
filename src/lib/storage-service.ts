@@ -6,7 +6,7 @@ export class StorageService {
     private uploadPath: string;
 
     constructor(databaseIdHash: string) {
-        this.rootPath = path.resolve(process.cwd());
+        this.rootPath = process.env.DATA_PATH ? path.resolve(process.env.DATA_PATH) : path.resolve(process.cwd());
         this.uploadPath =path.join(this.rootPath, 'data', databaseIdHash)
     }
 

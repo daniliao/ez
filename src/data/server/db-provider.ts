@@ -5,7 +5,8 @@ import path from 'path'
 import { getCurrentTS } from '@/lib/utils';
 import fs from 'fs';
 
-const rootPath = path.resolve(process.cwd())
+// Use environment variable for data path (for Render disk mounting) with fallback to current working directory
+const rootPath = process.env.DATA_PATH ? path.resolve(process.env.DATA_PATH) : path.resolve(process.cwd())
 
 export type DatabaseManifest = {
 	databaseIdHash: string,
